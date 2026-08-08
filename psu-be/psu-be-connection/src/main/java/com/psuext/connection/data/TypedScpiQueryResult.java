@@ -1,0 +1,59 @@
+package com.psuext.connection.data;
+
+/*-
+ * #%L
+ * PSU-BE Connection
+ * %%
+ * Copyright (C) 2026 The PSU-EXT Authors
+ * %%
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * 
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ * 
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ * #L%
+ */
+
+/**
+ * Result of a typed DATA query issued through shared connection management.
+ *
+ * @param ok whether the query succeeded
+ * @param code stable error code, or {@code null} when successful
+ * @param message human-readable error detail, or {@code null} when successful
+ * @param data parsed DATA payload, or {@code null} when the query failed
+ */
+public record TypedScpiQueryResult(
+        boolean ok,
+        String code,
+        String message,
+        TypedScpiData data) {
+
+    /**
+     * Creates a successful typed query result.
+     *
+     * @param data parsed typed DATA payload
+     * @return successful result
+     */
+    public static TypedScpiQueryResult success(TypedScpiData data) {
+        return new TypedScpiQueryResult(true, null, null, data);
+    }
+
+    /**
+     * Creates a failed typed query result.
+     *
+     * @param code stable error code
+     * @param message human-readable error detail
+     * @return failed result
+     */
+    public static TypedScpiQueryResult error(String code, String message) {
+        return new TypedScpiQueryResult(false, code, message, null);
+    }
+}
+
+

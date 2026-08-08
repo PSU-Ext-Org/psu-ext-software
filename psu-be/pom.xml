@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.psuext</groupId>
+    <artifactId>psu-be</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <packaging>pom</packaging>
+
+    <name>PSU-BE</name>
+    <description>Backend workspace for PSU-EXT services.</description>
+
+    <organization>
+        <name>MaxEELabs</name>
+        <url>https://github.com/PSU-Ext-Org</url>
+    </organization>
+
+    <licenses>
+        <license>
+            <name>Apache License, Version 2.0</name>
+            <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
+            <distribution>repo</distribution>
+        </license>
+    </licenses>
+
+    <scm>
+        <connection>scm:git:https://github.com/PSU-Ext-Org/psu-ext-software.git</connection>
+        <developerConnection>scm:git:git@github.com:PSU-Ext-Org/psu-ext-software.git</developerConnection>
+        <url>https://github.com/PSU-Ext-Org/psu-ext-software/tree/main/psu-be</url>
+        <tag>HEAD</tag>
+    </scm>
+
+    <properties>
+
+        <!-- Licensing: keep in sync with the version in the root psu-be-praent/pom.xml,
+                which does not inherit this property. -->
+        <license-maven-plugin.version>2.5.0</license-maven-plugin.version>
+    </properties>
+
+    <modules>
+        <module>psu-be-bom</module>
+        <module>psu-be-parent</module>
+        <module>psu-be-test-support</module>
+        <module>psu-be-transport</module>
+        <module>psu-be-connection</module>
+        <module>psu-be-script-runner</module>
+        <module>psu-be-proxy</module>
+    </modules>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>license-maven-plugin</artifactId>
+                <version>${license-maven-plugin.version}</version>
+                <configuration>
+                    <excludedScopes>test</excludedScopes>
+                    <includeTransitiveDependencies>true</includeTransitiveDependencies>
+                    <outputDirectory>${maven.multiModuleProjectDirectory}/target/generated-sources/license</outputDirectory>
+                    <thirdPartyFilename>THIRD-PARTY.txt</thirdPartyFilename>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>

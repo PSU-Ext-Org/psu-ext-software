@@ -1,0 +1,27 @@
+spring:
+  application:
+    name: psu-be-proxy
+
+logging:
+  level:
+    com.psuext: DEBUG
+
+psu:
+  transport:
+    tcp:
+      connect-timeout: 5s
+      read-timeout: 5s
+      command-timeout: 5s
+      timeout-disconnect-threshold: 3
+      line-ending: "\n"
+      response-delimiter: "\n"
+    usb:
+      platform: x86_64
+      read-timeout: 5s
+      command-timeout: 5s
+      timeout-disconnect-threshold: 3
+      line-ending: "\n"
+      response-delimiter: "\n"
+  connection:
+    devices:
+      file: ./devices.json

@@ -1,0 +1,16 @@
+{
+  "scripts": [
+    {
+      "id": "fixture-alpha",
+      "name": "Fixture alpha",
+      "position": 20,
+      "tags": ["voltage"]
+    },
+    {
+      "id": "fixture-beta",
+      "name": "Fixture beta",
+      "position": 10,
+      "tags": ["current"]
+    }
+  ]
+}

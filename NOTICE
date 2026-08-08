@@ -1,0 +1,30 @@
+PSU-EXT
+Copyright 2026 The PSU-EXT Authors
+
+This product includes software developed by The PSU-EXT Authors
+(https://github.com/PSU-Ext-Org).
+
+This product is licensed under the Apache License, Version 2.0. See the
+LICENSE file for the full license text.
+
+================================================================================
+Third-Party Software
+================================================================================
+
+This product depends on third-party libraries at build/runtime that are not
+part of this codebase and are not covered by the Apache License, Version 2.0.
+Notably:
+
+* jSerialComm (com.fazecast:jSerialComm)
+  https://github.com/Fazecast/jSerialComm
+  Licensed, at the recipient's option, under the GNU Lesser General Public
+  License v3.0, the GNU General Public License v3.0, or a separate commercial
+  license sold by the author. It is used unmodified as a runtime dependency
+  and is not bundled with, statically linked into, or distributed as part of
+  this project's own source or binaries; it must be obtained separately
+  (e.g. via Maven Central) by anyone who builds or runs this project.
+
+See psu-be/THIRD-PARTY-NOTICES.md for the full list of psu-be's direct
+dependencies and their licenses. Other subprojects added to this repository
+in the future (e.g. a frontend) maintain their own THIRD-PARTY-NOTICES.md
+scoped to their own dependency ecosystem.

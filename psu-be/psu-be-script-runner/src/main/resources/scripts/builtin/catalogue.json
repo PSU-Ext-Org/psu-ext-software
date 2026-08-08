@@ -1,0 +1,64 @@
+{
+  "scripts": [
+    {
+      "id": "1-hello-runner",
+      "name": "1. Hello, Script Runner",
+      "position": 1,
+      "tags": ["beginner", "javascript", "logging"]
+    },
+    {
+      "id": "2-identify-psu-ext",
+      "name": "2. Identify PSU-EXT",
+      "position": 2,
+      "tags": ["beginner", "scpi", "identity"]
+    },
+    {
+      "id": "3-read-ch0-input-voltage",
+      "name": "3. Read CH0 Input Voltage",
+      "position": 3,
+      "tags": ["beginner", "measurement", "voltage", "ch0"]
+    },
+    {
+      "id": "4-read-ch1-output-measurements",
+      "name": "4. Read CH1 Output Measurements",
+      "position": 4,
+      "tags": ["beginner", "measurement", "voltage", "current", "power", "ch1"]
+    },
+    {
+      "id": "5-ask-before-enabling-output",
+      "name": "5. Ask Before Enabling Output",
+      "position": 5,
+      "tags": ["beginner", "input", "conditionals", "relay", "ch1"]
+    },
+    {
+      "id": "6-sample-voltage-in-a-loop",
+      "name": "6. Sample Voltage in a Loop",
+      "position": 6,
+      "tags": ["beginner", "javascript", "loop", "progress", "voltage"]
+    },
+    {
+      "id": "7-compare-ch0-and-ch1-voltage",
+      "name": "7. Compare CH0 and CH1 Voltage",
+      "position": 7,
+      "tags": ["beginner", "measurement", "voltage", "ch0", "ch1", "chart", "csv"]
+    },
+    {
+      "id": "8-log-ch1-power-and-energy",
+      "name": "8. Log CH1 Power and Energy",
+      "position": 8,
+      "tags": ["beginner", "measurement", "voltage", "current", "power", "chart", "csv"]
+    },
+    {
+      "id": "9-operator-selected-measurement-run",
+      "name": "9. Operator-Selected Measurement Run",
+      "position": 9,
+      "tags": ["beginner", "input", "javascript", "loop", "measurement"]
+    },
+    {
+      "id": "10-relay-click-melody",
+      "name": "10. Relay Click Melody",
+      "position": 10,
+      "tags": ["beginner", "javascript", "loop", "relay", "ch1"]
+    }
+  ]
+}

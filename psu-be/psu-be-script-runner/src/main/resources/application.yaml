@@ -1,0 +1,51 @@
+spring:
+  application:
+    name: psu-be-script-runner
+
+logging:
+  level:
+    com.psuext.script.execution.scpi: INFO
+    com.psuext.transport.core.UsbScpiTransport: INFO
+
+server:
+  port: 8081
+
+psu:
+  transport:
+    tcp:
+      connect-timeout: 5s
+      read-timeout: 5s
+      command-timeout: 5s
+      timeout-disconnect-threshold: 3
+      line-ending: "\n"
+      response-delimiter: "\n"
+    usb:
+      platform: x86_64
+      read-timeout: 5s
+      command-timeout: 5s
+      write-response-timeout: 50ms
+      timeout-disconnect-threshold: 3
+      line-ending: "\n"
+      response-delimiter: "\n"
+  connection:
+    devices:
+      file: ./devices.json
+  web:
+    cors:
+      allowed-origin: http://localhost:5173
+  scripts:
+    management:
+      user-directory: ./script-definitions
+      maximum-source-code-size: 256KB
+    storage:
+      directory: ./script-storage
+    execution:
+      maximum-sleep: 5m
+    runtime:
+      maximum-completed-tasks: 500
+      completed-task-retention: 1h
+    executors:
+      execution-pool-size: 4
+      execution-queue-capacity: 100
+      event-delivery-pool-size: 2
+      event-delivery-queue-capacity: 100

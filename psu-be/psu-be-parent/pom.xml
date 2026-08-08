@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.psuext</groupId>
+    <artifactId>psu-be-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <packaging>pom</packaging>
+
+    <name>PSU-BE Parent</name>
+    <description>Build configuration shared by PSU-EXT backend modules.</description>
+
+    <organization>
+        <name>MaxEELabs</name>
+        <url>https://github.com/PSU-Ext-Org</url>
+    </organization>
+
+    <licenses>
+        <license>
+            <name>Apache License, Version 2.0</name>
+            <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
+            <distribution>repo</distribution>
+        </license>
+    </licenses>
+
+    <scm>
+        <connection>scm:git:https://github.com/PSU-Ext-Org/psu-ext-software.git</connection>
+        <developerConnection>scm:git:git@github.com:PSU-Ext-Org/psu-ext-software.git</developerConnection>
+        <url>https://github.com/PSU-Ext-Org/psu-ext-software/tree/main/psu-be</url>
+        <tag>HEAD</tag>
+    </scm>
+
+    <properties>
+        <java.version>17</java.version>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+        <maven.compiler.release>${java.version}</maven.compiler.release>
+        <maven.compiler.plugin.version>3.14.0</maven.compiler.plugin.version>
+        <maven.surefire.plugin.version>3.5.3</maven.surefire.plugin.version>
+        <spring-boot.maven-plugin.version>4.0.6</spring-boot.maven-plugin.version>
+        <psu-be.version>${project.version}</psu-be.version>
+
+        <!-- Licensing: keep in sync with the version in the root psu-be/pom.xml,
+                which does not inherit this property. -->
+        <license-maven-plugin.version>2.5.0</license-maven-plugin.version>
+        <license-maven-plugin.licenseName>apache_v2</license-maven-plugin.licenseName>
+        <license-maven-plugin.inceptionYear>2026</license-maven-plugin.inceptionYear>
+        <license-maven-plugin.organizationName>The PSU-EXT Authors</license-maven-plugin.organizationName>
+
+        <!-- Prevent Maven from appending each child artifactId to the inherited SCM URLs above. -->
+        <project.scm.id>github</project.scm.id>
+        <child.scm.connection.inherit.append.path>false</child.scm.connection.inherit.append.path>
+        <child.scm.developerConnection.inherit.append.path>false</child.scm.developerConnection.inherit.append.path>
+        <child.scm.url.inherit.append.path>false</child.scm.url.inherit.append.path>
+    </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>com.psuext</groupId>
+                <artifactId>psu-be-bom</artifactId>
+                <version>${psu-be.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <version>${maven.compiler.plugin.version}</version>
+                    <configuration>
+                        <release>${java.version}</release>
+                    </configuration>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-surefire-plugin</artifactId>
+                    <version>${maven.surefire.plugin.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-maven-plugin</artifactId>
+                    <version>${spring-boot.maven-plugin.version}</version>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+        <plugins>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>license-maven-plugin</artifactId>
+                <version>${license-maven-plugin.version}</version>
+                <configuration>
+                    <licenseName>${license-maven-plugin.licenseName}</licenseName>
+                    <inceptionYear>${license-maven-plugin.inceptionYear}</inceptionYear>
+                    <organizationName>${license-maven-plugin.organizationName}</organizationName>
+                    <canUpdateCopyright>true</canUpdateCopyright>
+                    <canUpdateDescription>false</canUpdateDescription>
+                    <roots>
+                        <root>src</root>
+                    </roots>
+                    <includes>
+                        <include>**/*.java</include>
+                    </includes>
+                    <failOnMissingHeader>true</failOnMissingHeader>
+                    <failOnNotUptodateHeader>true</failOnNotUptodateHeader>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>check-license-headers</id>
+                        <phase>validate</phase>
+                        <goals>
+                            <goal>check-file-header</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>

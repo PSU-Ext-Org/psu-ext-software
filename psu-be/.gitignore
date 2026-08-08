@@ -1,0 +1,21 @@
+# Maven local repository/cache for this backend workspace
+.mvn/repository/
+.mvn/wrapper/dists/
+
+# Java/Maven build outputs
+target/
+**/target/
+
+# IDE/build metadata
+.classpath
+.project
+.settings/
+.idea/
+*.iml
+
+# Logs and runtime scratch files
+*.log
+logs/
+/psu-be-script-runner/script-results/
+/script-definitions/
+/script-storage/
