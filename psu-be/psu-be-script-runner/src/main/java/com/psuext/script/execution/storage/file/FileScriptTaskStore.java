@@ -51,6 +51,7 @@ public final class FileScriptTaskStore implements ScriptTaskStore {
 
     private final Path rootDirectory;
     private final ObjectMapper objectMapper;
+    private final Object writeLock = new Object();
 
     /** Creates a catalogue rooted at the configured script-storage directory. */
     public FileScriptTaskStore(Path rootDirectory, ObjectMapper objectMapper) {
@@ -61,15 +62,21 @@ public final class FileScriptTaskStore implements ScriptTaskStore {
 
     @Override
     public void save(ScriptTaskRecord record) {
-        Path directory = rootDirectory.resolve(record.taskId().toString());
-        try {
-            Files.createDirectories(directory);
-            Path temporary = directory.resolve(TEMP_TASK_FILE);
-            Path target = directory.resolve(TASK_FILE);
-            objectMapper.writeValue(temporary.toFile(), record);
-            move(temporary, target);
-        } catch (IOException exception) {
-            throw failure("save", exception);
+        // Concurrent task-state transitions (e.g. resuming pending input while another
+        // thread completes the same task) can otherwise race on the shared temp file name
+        // below, corrupting or losing the write. Serialize saves so each write+move
+        // completes atomically with respect to the others.
+        synchronized (writeLock) {
+            Path directory = rootDirectory.resolve(record.taskId().toString());
+            try {
+                Files.createDirectories(directory);
+                Path temporary = directory.resolve(TEMP_TASK_FILE);
+                Path target = directory.resolve(TASK_FILE);
+                objectMapper.writeValue(temporary.toFile(), record);
+                move(temporary, target);
+            } catch (IOException exception) {
+                throw failure("save", exception);
+            }
         }
     }
 

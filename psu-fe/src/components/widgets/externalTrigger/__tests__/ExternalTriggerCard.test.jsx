@@ -132,7 +132,7 @@ describe("ExternalTriggerControlCard", () => {
 
     render(<ExternalTriggerControlCard placement={{ id: "trigger-main" }} />);
 
-    await waitFor(() => expect(screen.getByLabelText("T1 HIGH action")).toHaveValue("NONE"));
+    await waitFor(() => expect(screen.getByLabelText("T1 LOW action")).toHaveValue("OUT_ON,CH1"));
     expect(screen.getByRole("button", { name: "Save trigger configuration" })).toBeDisabled();
     fireEvent.change(screen.getByLabelText("T1 HIGH action"), {
       target: { value: "TIM_START,CH1" },

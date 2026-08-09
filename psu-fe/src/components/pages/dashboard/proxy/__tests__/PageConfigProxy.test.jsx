@@ -278,8 +278,12 @@ describe("PageConfigProxy", () => {
     const deviceListWidget = screen.getByLabelText("Device List");
     const identityCellText = within(deviceListWidget).getByText("Acme Instruments PSU-EXT | SN SN01 | FW 1.0");
 
-    expect(identityCellText).toHaveClass("block", "truncate");
-    expect(identityCellText).toHaveAttribute("title", "Acme Instruments PSU-EXT | SN SN01 | FW 1.0");
+    expect(identityCellText).toHaveClass("inline-block", "whitespace-nowrap");
+    expect(identityCellText.parentElement).toHaveClass("overflow-hidden");
+    expect(identityCellText.parentElement).toHaveAttribute(
+      "title",
+      "Acme Instruments PSU-EXT | SN SN01 | FW 1.0",
+    );
   });
 
   it("uses the shared cardless monitor body in the monitor widget", () => {
