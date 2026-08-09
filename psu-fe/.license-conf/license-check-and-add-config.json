@@ -1,0 +1,30 @@
+{
+  "license": ".license-conf/LICENSE-HEADER.txt",
+  "licenseFormats": {
+    "js|jsx|mjs|css": {
+      "prepend": "/**",
+      "append": " */",
+      "eachLine": {
+        "prepend": " * "
+      }
+    }
+  },
+  "ignore": [
+    ".DS_Store",
+    ".gitignore",
+    ".npmrc",
+    "AGENTS.md",
+    "README.MD",
+    "THIRD-PARTY-NOTICES.md",
+    "index.html",
+    "vite.config.js",
+    ".spec/**",
+    "src/**/*.svg",
+    "src/**/*.woff",
+    "src/**/*.woff2",
+    "src/**/*.ttf",
+    "src/**/*.eot",
+    "src/**/*.otf",
+    "src/**/*.webp"
+  ]
+}

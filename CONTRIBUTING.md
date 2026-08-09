@@ -51,7 +51,33 @@ Review the output and update `psu-be/THIRD-PARTY-NOTICES.md` accordingly,
 especially if the new dependency's license differs from
 Apache-2.0/MIT/BSD/EPL.
 
+If your change adds, removes, or upgrades a dependency in `psu-fe/package.json`,
+regenerate and update `psu-fe/THIRD-PARTY-NOTICES.md` in the same pull
+request, from the `psu-fe` directory:
+
+```
+npx @lizenz/checker --json --depth 0
+```
+
+Review the output and update `psu-fe/THIRD-PARTY-NOTICES.md` accordingly,
+especially if the new dependency's license isn't MIT/ISC/Apache-2.0/BSD.
+
+## Per-file license headers
+
+`psu-fe`'s `.js`/`.jsx`/`.mjs`/`.css` source files under `src/` and
+`scripts/` carry an Apache-2.0 header, applied and verified by
+`license-check-and-add` (config in `psu-fe/.license-conf/`). `npm run build`
+and `npm run test` both run `license:check` first and fail on a missing or
+stale header. Add the header to any new file with:
+
+```
+npm run license:add
+```
+
+from the `psu-fe` directory.
+
 ## Getting started
 
 See `psu-be/AGENTS.md` and `psu-be/README.md` for the backend workspace's
-build setup, coding conventions, and verification commands.
+build setup, coding conventions, and verification commands, or
+`psu-fe/AGENTS.md` and `psu-fe/README.MD` for the frontend's.
