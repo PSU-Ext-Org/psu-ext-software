@@ -47,6 +47,10 @@ export function IdeWorkspace({ scriptBindingApiUrl, scriptSourceApiUrl, scriptTa
     closePopup();
   }
 
+  function createIdeDocument() {
+    openIdeDocument({});
+  }
+
   async function persistScript(script, savedId, forceCreate) {
     const url = !forceCreate && savedId ? `${scriptSourceApiUrl}/user/${encodeURIComponent(savedId)}` : `${scriptSourceApiUrl}/user`;
     const saved = await requestJson(url, { method: !forceCreate && savedId ? "PUT" : "POST", body: JSON.stringify(script) });
@@ -66,7 +70,13 @@ export function IdeWorkspace({ scriptBindingApiUrl, scriptSourceApiUrl, scriptTa
   return (
     <div className="h-dvh">
       <IdeScriptEditor
-        bottomPanel={consoleTask ? <ScriptTaskConsole onClose={() => setConsoleTask(null)} task={consoleTask} taskApiUrl={scriptTaskApiUrl} /> : null}
+        bottomPanel={consoleTask ? (
+          <ScriptTaskConsole
+            onClose={() => setConsoleTask(null)}
+            task={consoleTask}
+            taskApiUrl={scriptTaskApiUrl}
+          />
+        ) : null}
         document={document || {}}
         loadBindings={() => requestJson(scriptBindingApiUrl)}
         loadBuiltinDetail={(id) => requestJson(`${scriptSourceApiUrl}/builtin/${encodeURIComponent(id)}`)}
@@ -76,12 +86,57 @@ export function IdeWorkspace({ scriptBindingApiUrl, scriptSourceApiUrl, scriptTa
         onOpenPopup={openPopup}
         onPersist={persistScript}
         onRun={runScript}
-        onTagsReload={tagHints.reload}
+        tagHints={tagHints}
       />
-      {popup === "sources" ? <IdePopupDialog dialogClassName="h-[38rem] max-h-[calc(100dvh-2rem)]" fill size="xl" title="Script Sources" onClose={closePopup}><ScriptSourcesWidget actions={<ScriptSourcesActions />} onNewScript={() => openIdeDocument({})} onOpenScript={openIdeDocument} /></IdePopupDialog> : null}
-      {popup === "tasks" ? <IdePopupDialog dialogClassName="h-[38rem] max-h-[calc(100dvh-2rem)]" fill size="xl" title="Script Tasks" onClose={closePopup}><ScriptTasksWidget actions={<ScriptTasksActions />} onOpenTask={openTask} /></IdePopupDialog> : null}
-      {popup === "backend" ? <IdePopupDialog compact size="lg" title="Script Backend" onClose={closePopup}><ScriptBackendConfigWidget compact /></IdePopupDialog> : null}
-      {popup === "devices" ? <IdePopupDialog actions={<DeviceManagerActions placement={IDE_DEVICE_PLACEMENT} />} size="xxl" title="Script Runner Devices" onClose={closePopup}><DeviceManagerWidget placement={IDE_DEVICE_PLACEMENT} /></IdePopupDialog> : null}
+      {popup === "sources" ? (
+        <IdePopupDialog
+          dialogClassName="h-[38rem] max-h-[calc(100dvh-2rem)]"
+          fill
+          onClose={closePopup}
+          size="xl"
+          title="Script Sources"
+        >
+          <ScriptSourcesWidget
+            actions={<ScriptSourcesActions />}
+            onNewScript={createIdeDocument}
+            onOpenScript={openIdeDocument}
+          />
+        </IdePopupDialog>
+      ) : null}
+      {popup === "tasks" ? (
+        <IdePopupDialog
+          dialogClassName="h-[38rem] max-h-[calc(100dvh-2rem)]"
+          fill
+          onClose={closePopup}
+          size="xl"
+          title="Script Tasks"
+        >
+          <ScriptTasksWidget
+            actions={<ScriptTasksActions />}
+            onOpenTask={openTask}
+          />
+        </IdePopupDialog>
+      ) : null}
+      {popup === "backend" ? (
+        <IdePopupDialog
+          compact
+          onClose={closePopup}
+          size="lg"
+          title="Script Backend"
+        >
+          <ScriptBackendConfigWidget compact />
+        </IdePopupDialog>
+      ) : null}
+      {popup === "devices" ? (
+        <IdePopupDialog
+          actions={<DeviceManagerActions placement={IDE_DEVICE_PLACEMENT} />}
+          onClose={closePopup}
+          size="xxl"
+          title="Script Runner Devices"
+        >
+          <DeviceManagerWidget placement={IDE_DEVICE_PLACEMENT} />
+        </IdePopupDialog>
+      ) : null}
     </div>
   );
 }

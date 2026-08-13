@@ -14,7 +14,7 @@
   const outputEnableSettlingMilliseconds = 5000;
   const measurementSettlingMilliseconds = 2000;
   const operatorInputTimeoutMilliseconds = 15 * 60 * 1000;
-  const calibrationTargetCurrentsAmps = [0, 0.005, 0.025, 0.050, 0.200, 0.500, 1.000, 2.000];
+  const calibrationTargetCurrentsAmps = [0, 0.0010, 0.0050, 0.0100, 0.0500, 0.1000, 0.250, 0.500];
 
   if (psuExtChannel !== "CH1") {
     throw new Error("PSU-EXT current calibration supports only CH1");
