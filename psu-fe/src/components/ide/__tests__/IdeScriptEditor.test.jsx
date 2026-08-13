@@ -53,6 +53,57 @@ describe("IdeScriptEditor", () => {
       null,
     ));
   });
+
+  it("opens Save Script As before saving a new document", async () => {
+    const onPersist = vi.fn(() => Promise.resolve({ id: "created", name: "New Script", sourceCode: "(() => {})();", tags: [] }));
+    const tagHints = { error: "", load: vi.fn(), loading: false, reload: vi.fn(), tags: [] };
+    render(<IdeScriptEditor {...editorProps({ document: {}, onPersist, tagHints })} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "File" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Save" }));
+
+    expect(screen.getByRole("dialog", { name: "Save Script As" })).toBeInTheDocument();
+    expect(onPersist).not.toHaveBeenCalled();
+    expect(tagHints.load).toHaveBeenCalledOnce();
+    fireEvent.change(screen.getByLabelText("Name"), { target: { value: "New Script" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(onPersist).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "New Script" }),
+      null,
+      true,
+    ));
+  });
+
+  it("overwrites an existing script with Save", async () => {
+    const onPersist = vi.fn((script) => Promise.resolve({ id: "current", ...script }));
+    render(<IdeScriptEditor {...editorProps({ onPersist })} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "File" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Save" }));
+
+    await waitFor(() => expect(onPersist).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "Current" }),
+      "current",
+      false,
+    ));
+    expect(screen.queryByRole("dialog", { name: "Save Script As" })).not.toBeInTheDocument();
+  });
+
+  it("creates a copy of an existing script with Save As", async () => {
+    const onPersist = vi.fn((script) => Promise.resolve({ id: "copy", ...script }));
+    render(<IdeScriptEditor {...editorProps({ onPersist })} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "File" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Save As" }));
+    expect(screen.getByRole("dialog", { name: "Save Script As" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(onPersist).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "Current" }),
+      null,
+      true,
+    ));
+  });
 });
 
 function editorProps(overrides = {}) {

@@ -16,14 +16,35 @@
 import { Download, FileCode2, FilePlus2, FolderOpen, LoaderCircle, Play, Save, Settings, SquareStack, Upload, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { useModalDialog } from "../layout/hooks/useModalDialog.js";
 import { ScriptEditor } from "../widgets/scriptEditor/components/ScriptEditor.jsx";
 import { EMPTY_SCRIPT_SOURCE, fileNameToTitle, normaliseScript, parseTags, scriptFileName, shortScriptId, validateWrappedScript } from "../widgets/scriptEditor/utils/scriptDocument.js";
-import { useModalDialog } from "../layout/hooks/useModalDialog.js";
-import { IdeMenuBar } from "./IdeMenuBar.jsx";
 import { sortBuiltinTemplates } from "../widgets/scriptSources/utils/sortBuiltinTemplates.js";
+import { IdeSaveScriptDialog } from "./components/IdeSaveScriptDialog.jsx";
+import { IdeMenuBar } from "./IdeMenuBar.jsx";
+
+const EMPTY_TAG_HINTS = {
+  error: "",
+  load: undefined,
+  loading: false,
+  reload: undefined,
+  tags: [],
+};
 
 /** Full-window editor shell for the document selected by the IDE workspace. */
-export function IdeScriptEditor({ bottomPanel, document: scriptDocument, loadBindings, loadBuiltinDetail, loadBuiltinTemplates, onClose, onOpenDocument, onOpenPopup, onPersist, onRun, onTagsReload }) {
+export function IdeScriptEditor({
+  bottomPanel,
+  document: scriptDocument,
+  loadBindings,
+  loadBuiltinDetail,
+  loadBuiltinTemplates,
+  onClose,
+  onOpenDocument,
+  onOpenPopup,
+  onPersist,
+  onRun,
+  tagHints = EMPTY_TAG_HINTS,
+}) {
   const initial = useMemo(() => normaliseScript(scriptDocument), [scriptDocument]);
   const [name, setName] = useState(initial.name);
   const [sourceCode, setSourceCode] = useState(initial.sourceCode);
@@ -36,6 +57,7 @@ export function IdeScriptEditor({ bottomPanel, document: scriptDocument, loadBin
   const [loadingTemplate, setLoadingTemplate] = useState(false);
   const [running, setRunning] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const fileInputRef = useRef(null);
   const sourceError = validateWrappedScript(sourceCode);
   const dirty = name !== baseline.name || sourceCode !== baseline.sourceCode;
@@ -65,7 +87,7 @@ export function IdeScriptEditor({ bottomPanel, document: scriptDocument, loadBin
     function saveShortcut(event) {
       if ((!event.ctrlKey && !event.metaKey) || event.altKey || event.key.toLowerCase() !== "s") return;
       event.preventDefault();
-      void save();
+      requestSave(false);
     }
     document.addEventListener("keydown", saveShortcut);
     return () => document.removeEventListener("keydown", saveShortcut);
@@ -92,18 +114,48 @@ export function IdeScriptEditor({ bottomPanel, document: scriptDocument, loadBin
     });
   }
 
-  async function save(forceCreate = false) {
-    if (!canSave || saving) return;
+  function requestSave(forceCreate) {
+    if (forceCreate || !savedId) {
+      setSaveDialogOpen(true);
+      void tagHints.load?.();
+      return;
+    }
+    void save(false);
+  }
+
+  function closeSaveDialog() {
+    setSaveDialogOpen(false);
+  }
+
+  function saveAs(metadata) {
+    return save(true, metadata);
+  }
+
+  function closeEditor() {
+    requestAction(onClose);
+  }
+
+  function discardPendingAction() {
+    const action = pendingAction;
+    setPendingAction(null);
+    action?.();
+  }
+
+  async function save(forceCreate = false, metadata = null) {
+    const nextName = metadata?.name?.trim() || name.trim();
+    const nextTags = metadata ? parseTags(metadata.tags) : baseline.tags || [];
+    if (!nextName || !sourceCode.trim() || sourceError || saving) return;
     setSaving(true);
     setError("");
     try {
-      const saved = await onPersist({ name: name.trim(), sourceCode, tags: baseline.tags || [] }, forceCreate ? null : savedId, forceCreate);
+      const saved = await onPersist({ name: nextName, sourceCode, tags: nextTags }, forceCreate ? null : savedId, forceCreate);
       const next = normaliseScript(saved);
       setSavedId(saved.id);
       setBaseline(next);
       setName(next.name);
       setSourceCode(next.sourceCode);
-      if (!savedId || forceCreate) await onTagsReload?.();
+      setSaveDialogOpen(false);
+      if (!savedId || forceCreate) await tagHints.reload?.();
     } catch (requestError) {
       setError(requestError.message || "Could not save script.");
     } finally {
@@ -118,7 +170,7 @@ export function IdeScriptEditor({ bottomPanel, document: scriptDocument, loadBin
     try {
       const result = await onRun({ name: name.trim(), sourceCode, tags: baseline.tags || [] }, savedId);
       replaceDocument(result.script);
-      await onTagsReload?.();
+      await tagHints.reload?.();
     } catch (requestError) {
       setError(requestError.message || "Could not save and run script.");
     } finally {
@@ -162,8 +214,8 @@ export function IdeScriptEditor({ bottomPanel, document: scriptDocument, loadBin
       { id: "new", label: "New File", mnemonic: "w", globalMnemonic: true, icon: <FilePlus2 className="h-4 w-4" />, action: createDocument },
       { id: "open", label: "Open", mnemonic: "o", globalMnemonic: true, icon: <FolderOpen className="h-4 w-4" />, action: () => onOpenPopup("sources") },
       { type: "separator" },
-      { id: "save", label: "Save", mnemonic: "v", globalMnemonic: true, icon: <Save className="h-4 w-4" />, action: () => save(false) },
-      { id: "save-as", label: "Save As", mnemonic: "a", globalMnemonic: true, icon: <Save className="h-4 w-4" />, action: () => save(true) },
+      { id: "save", label: "Save", mnemonic: "v", globalMnemonic: true, icon: <Save className="h-4 w-4" />, action: () => requestSave(false) },
+      { id: "save-as", label: "Save As", mnemonic: "a", globalMnemonic: true, icon: <Save className="h-4 w-4" />, action: () => requestSave(true) },
       { type: "separator" },
       { id: "import", label: "Import", mnemonic: "i", globalMnemonic: true, icon: <Download className="h-4 w-4" />, action: () => fileInputRef.current?.click() },
       { id: "export", label: "Export", mnemonic: "e", globalMnemonic: true, icon: <Upload className="h-4 w-4" />, action: exportFile },
@@ -182,17 +234,53 @@ export function IdeScriptEditor({ bottomPanel, document: scriptDocument, loadBin
       <header className="flex h-14 shrink-0 items-center border-b border-slate-200 px-4">
         <h1 className="mr-3 text-sm font-semibold text-slate-900">IDE</h1>
         <IdeMenuBar items={menuItems} />
-        <button aria-label="Close IDE" className="ml-auto rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700" onClick={() => requestAction(onClose)} type="button"><X className="h-5 w-5" /></button>
+        <button
+          aria-label="Close IDE"
+          className="ml-auto rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+          onClick={closeEditor}
+          type="button"
+        >
+          <X className="h-5 w-5" />
+        </button>
       </header>
       <main className="flex min-h-0 flex-1 flex-col p-4">
-        <div className="shrink-0 rounded-t-md border border-slate-300 border-b-0 bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-500">{savedId ? shortScriptId(savedId) : "*"} · {scriptFileName(name)}</div>
-        <ScriptEditor bindings={bindings} flushTop onChange={setSourceCode} value={sourceCode || EMPTY_SCRIPT_SOURCE} />
+        <div className="shrink-0 rounded-t-md border border-slate-300 border-b-0 bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-500">
+          {savedId ? shortScriptId(savedId) : "*"} · {scriptFileName(name)}
+        </div>
+        <ScriptEditor
+          bindings={bindings}
+          flushTop
+          onChange={setSourceCode}
+          value={sourceCode || EMPTY_SCRIPT_SOURCE}
+        />
         {sourceError ? <p className="mt-2 text-xs text-rose-600">{sourceError}</p> : null}
         {error ? <p className="mt-2 text-xs text-rose-600">{error}</p> : null}
       </main>
       {bottomPanel}
-      <input accept=".js,text/javascript,application/javascript" aria-label="Import JavaScript File" className="hidden" onChange={importFile} ref={fileInputRef} type="file" />
-      {pendingAction ? <DiscardChangesDialog onCancel={() => setPendingAction(null)} onDiscard={() => { const action = pendingAction; setPendingAction(null); action(); }} /> : null}
+      <input
+        accept=".js,text/javascript,application/javascript"
+        aria-label="Import JavaScript File"
+        className="hidden"
+        onChange={importFile}
+        ref={fileInputRef}
+        type="file"
+      />
+      {pendingAction ? (
+        <DiscardChangesDialog
+          onCancel={() => setPendingAction(null)}
+          onDiscard={discardPendingAction}
+        />
+      ) : null}
+      {saveDialogOpen ? (
+        <IdeSaveScriptDialog
+          initialName={name}
+          initialTags={baseline.tags}
+          onCancel={closeSaveDialog}
+          onSave={saveAs}
+          saving={saving}
+          tagHints={tagHints}
+        />
+      ) : null}
     </div>
   );
 }
