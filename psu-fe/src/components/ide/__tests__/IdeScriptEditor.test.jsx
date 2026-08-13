@@ -36,6 +36,18 @@ describe("IdeScriptEditor", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: "Continue Editing" })).toHaveFocus());
   });
 
+  it("marks a modified saved script as dirty next to its filename", () => {
+    render(<IdeScriptEditor {...editorProps()} />);
+    const sourceEditor = screen.getByLabelText("JavaScript source editor");
+
+    expect(screen.getByText(/Current\.js$/)).toBeInTheDocument();
+    fireEvent.change(sourceEditor, { target: { value: "(() => { return 2; })();" } });
+    expect(screen.getByText(/Current\.js \*$/)).toBeInTheDocument();
+
+    fireEvent.change(sourceEditor, { target: { value: "(() => { return 1; })();" } });
+    expect(screen.getByText(/Current\.js$/)).toBeInTheDocument();
+  });
+
   it("runs a loaded template as a new user source", async () => {
     const onRun = vi.fn(() => Promise.resolve({ script: { id: "user-1", name: "Record", sourceCode: "(() => { return 1; })();" } }));
     const loadBuiltinTemplates = vi.fn(() => Promise.resolve({ items: [{ id: "record", name: "Record" }] }));

@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { ChevronDown, Pencil, Play, Plus, RotateCcw, Trash2 } from "lucide-react";
+import { ChevronDown, Pencil, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useScriptRunnerHttp } from "../../../../connection/http-script/ScriptRunnerHttpContext.jsx";
 import { Field } from "../../../forms/Field.jsx";
@@ -27,7 +27,6 @@ import { useScriptTagHints } from "../hooks/useScriptTagHints.js";
 
 const NEW_SCRIPT_EVENT = "psu-ext-open-script-source-new";
 const DELETE_SCRIPTS_EVENT = "psu-ext-open-script-source-delete";
-const RUN_SCRIPTS_EVENT = "psu-ext-run-script-sources";
 const EDIT_SCRIPT_EVENT = "psu-ext-open-script-source-edit";
 const SCRIPT_SELECTION_EVENT = "psu-ext-script-source-selection";
 
@@ -58,13 +57,34 @@ export function ScriptSourcesActions() {
     return () => document.removeEventListener("pointerdown", closeOnOutsidePointerDown);
   }, [open]);
 
+  function toggleMenu() {
+    setOpen((current) => !current);
+  }
+
+  function dispatchAction(eventName) {
+    setOpen(false);
+    window.dispatchEvent(new Event(eventName));
+  }
+
+  function createScript() {
+    dispatchAction(NEW_SCRIPT_EVENT);
+  }
+
+  function editSelectedScript() {
+    dispatchAction(EDIT_SCRIPT_EVENT);
+  }
+
+  function deleteSelectedScripts() {
+    dispatchAction(DELETE_SCRIPTS_EVENT);
+  }
+
   return (
     <div className="relative" ref={menuRef}>
       <button
         aria-expanded={open}
         aria-haspopup="menu"
         className="control-standard inline-flex items-center gap-2 bg-teal-700 px-3 font-medium text-white hover:bg-teal-800"
-        onClick={() => setOpen((current) => !current)}
+        onClick={toggleMenu}
         type="button"
       >
         Actions
@@ -74,36 +94,18 @@ export function ScriptSourcesActions() {
         <div className="absolute right-0 z-10 mt-1 grid min-w-28 overflow-hidden rounded-md border border-slate-200 bg-white py-1 shadow-lg" role="menu">
           <button
             className="inline-flex items-center gap-2 px-3 py-1.5 text-left text-sm font-medium text-slate-700 hover:bg-slate-50"
-            onClick={() => {
-              setOpen(false);
-              window.dispatchEvent(new Event(NEW_SCRIPT_EVENT));
-            }}
+            onClick={createScript}
             role="menuitem"
             type="button"
           >
             <Plus className="h-4 w-4" />
             New
           </button>
-          <button
-            className="inline-flex items-center gap-2 px-3 py-1.5 text-left text-sm font-medium text-teal-700 hover:bg-teal-50 disabled:opacity-50"
-            disabled={!selectedCount}
-            onClick={() => {
-              setOpen(false);
-              window.dispatchEvent(new Event(RUN_SCRIPTS_EVENT));
-            }}
-            role="menuitem"
-            type="button"
-          >
-            <Play className="h-4 w-4" />
-            Run
-          </button>
+          {/* Bulk Run is intentionally hidden; scripts run from the editor instead. */}
           <button
             className="inline-flex items-center gap-2 px-3 py-1.5 text-left text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
             disabled={selectedCount !== 1}
-            onClick={() => {
-              setOpen(false);
-              window.dispatchEvent(new Event(EDIT_SCRIPT_EVENT));
-            }}
+            onClick={editSelectedScript}
             role="menuitem"
             type="button"
           >
@@ -113,10 +115,7 @@ export function ScriptSourcesActions() {
           <button
             className="inline-flex items-center gap-2 px-3 py-1.5 text-left text-sm font-medium text-rose-700 hover:bg-rose-50 disabled:opacity-50"
             disabled={!selectedCount}
-            onClick={() => {
-              setOpen(false);
-              window.dispatchEvent(new Event(DELETE_SCRIPTS_EVENT));
-            }}
+            onClick={deleteSelectedScripts}
             role="menuitem"
             type="button"
           >
@@ -178,32 +177,6 @@ export function ScriptSourcesWidget({ actions, onNewScript, onOpenScript }) {
   function openSelectedForEdit() {
     const script = sources.user.items.find((item) => selectedIds.has(item.id));
     if (script) openEdit(script);
-  }
-
-  async function runSelected() {
-    const scripts = sources.user.items.filter((script) => selectedIds.has(script.id));
-    if (!scripts.length) return;
-    setDialogError("");
-    setLoadingDetail(true);
-    try {
-      await Promise.all(scripts.map(async (script) => {
-        const detail = await sources.getDetail("user", script.id);
-        const response = await fetch(scriptTaskApiUrl, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: detail.name, source: detail.sourceCode }),
-        });
-        if (!response.ok) {
-          const payload = await readResponse(response);
-          throw new Error(payload?.message || `Could not run ${script.name}.`);
-        }
-      }));
-      setSelectedIds(new Set());
-    } catch (error) {
-      setDialogError(error.message || "Could not start script task.");
-    } finally {
-      setLoadingDetail(false);
-    }
   }
 
   useEffect(() => {
@@ -270,7 +243,6 @@ export function ScriptSourcesWidget({ actions, onNewScript, onOpenScript }) {
         onDelete={openDeleteSelected}
         onEdit={openSelectedForEdit}
         onNew={() => onNewScript ? onNewScript() : setModal({ mode: "create" })}
-        onRun={runSelected}
       />
     </div>
   );
@@ -318,19 +290,17 @@ function DeleteScriptModal({ scripts, onDelete, onClose, onDeleted }) {
   );
 }
 
-function ScriptSourceActionListener({ onNew, onDelete, onEdit, onRun }) {
+function ScriptSourceActionListener({ onNew, onDelete, onEdit }) {
   useEffect(() => {
     window.addEventListener(NEW_SCRIPT_EVENT, onNew);
     window.addEventListener(DELETE_SCRIPTS_EVENT, onDelete);
     window.addEventListener(EDIT_SCRIPT_EVENT, onEdit);
-    window.addEventListener(RUN_SCRIPTS_EVENT, onRun);
     return () => {
       window.removeEventListener(NEW_SCRIPT_EVENT, onNew);
       window.removeEventListener(DELETE_SCRIPTS_EVENT, onDelete);
       window.removeEventListener(EDIT_SCRIPT_EVENT, onEdit);
-      window.removeEventListener(RUN_SCRIPTS_EVENT, onRun);
     };
-  }, [onDelete, onEdit, onNew, onRun]);
+  }, [onDelete, onEdit, onNew]);
   return null;
 }
 

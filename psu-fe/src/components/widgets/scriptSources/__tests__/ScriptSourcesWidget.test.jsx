@@ -163,30 +163,14 @@ describe("ScriptSourcesWidget", () => {
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
   });
 
-  it("loads and submits selected user scripts as tasks", async () => {
-    const fetchMock = vi.fn((url, options) => {
-      if (url.endsWith("/user/user-1")) {
-        return Promise.resolve(detailResponse({ ...summary("user-1", "Custom"), sourceCode: "return 42;" }));
-      }
-      if (url === "http://runner.test/api/scripts" && options?.method === "POST") {
-        return Promise.resolve({ ok: true, status: 202, text: () => Promise.resolve("{}") });
-      }
-      return Promise.resolve(pageResponse([summary("user-1", "Custom")], 1, 5));
-    });
+  it("hides the bulk Run action for selected user scripts", async () => {
+    const fetchMock = vi.fn(() => Promise.resolve(pageResponse([summary("user-1", "Custom")], 1, 5)));
     vi.stubGlobal("fetch", fetchMock);
     render(<><ScriptSourcesWidget /><ScriptSourcesActions /></>);
 
     fireEvent.click(await screen.findByLabelText("Select script Custom"));
     fireEvent.click(screen.getByRole("button", { name: "Actions" }));
-    fireEvent.click(screen.getByRole("menuitem", { name: "Run" }));
-
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
-      "http://runner.test/api/scripts",
-      expect.objectContaining({
-        method: "POST",
-        body: JSON.stringify({ name: "Custom", source: "return 42;" }),
-      }),
-    ));
+    expect(screen.queryByRole("menuitem", { name: "Run" })).not.toBeInTheDocument();
   });
 });
 
