@@ -30,8 +30,10 @@ import com.psuext.script.execution.model.ScriptLiveInputData;
 import com.psuext.script.execution.model.ScriptPendingInput;
 import com.psuext.script.execution.model.ScriptLiveEventType;
 import com.psuext.script.execution.model.ScriptResultEventLevel;
+import com.psuext.script.execution.model.ScriptTaskId;
 import com.psuext.script.execution.model.ScriptTaskResult;
 import com.psuext.script.execution.model.ScriptTaskResultSummary;
+import com.psuext.script.execution.model.ScriptTaskState;
 import com.psuext.script.execution.result.ScriptLiveEventPublisher;
 import com.psuext.script.execution.result.ScriptTaskResultAssembler;
 import com.psuext.script.execution.storage.ScriptTaskLogWriter;
@@ -59,9 +61,9 @@ public final class ScriptTaskLifecycleEffects {
                 new ScriptLiveTaskStateData(task.snapshot().state(), null));
     }
 
-    void cancelling(RunningScriptTask task, Instant timestamp) {
-        liveEventPublisher.publish(task.taskId(), timestamp, ScriptLiveEventType.CANCELLING,
-                new ScriptLiveTaskStateData(task.snapshot().state(), null));
+    void cancelling(ScriptTaskId taskId, Instant timestamp) {
+        liveEventPublisher.publish(taskId, timestamp, ScriptLiveEventType.CANCELLING,
+                new ScriptLiveTaskStateData(ScriptTaskState.CANCELLING, null));
     }
 
     void progress(RunningScriptTask task, double value, Instant timestamp) {
