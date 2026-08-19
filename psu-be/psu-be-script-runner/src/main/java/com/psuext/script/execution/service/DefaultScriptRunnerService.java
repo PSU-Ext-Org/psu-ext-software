@@ -251,15 +251,19 @@ public final class DefaultScriptRunnerService implements ScriptRunnerService {
             LOGGER.debug("Script task cancellation ignored: taskId={} reason=not_found", taskId);
             return false;
         }
-        boolean cancelled = task.cancel();
-        if (cancelled) {
-            taskStore.save(ScriptTaskRecord.from(task.snapshot()));
-            LOGGER.info("Script task cancellation accepted: taskId={}", taskId);
-            lifecycleEffects.cancelling(task, Instant.now());
-        } else {
-            LOGGER.debug("Script task cancellation ignored: taskId={} reason=terminal_or_cancelling", taskId);
+
+        // Keep transition effects ordered before the interrupted worker can publish its terminal state.
+        synchronized (task) {
+            boolean cancelled = task.cancel();
+            if (cancelled) {
+                taskStore.save(ScriptTaskRecord.from(task.snapshot()));
+                LOGGER.info("Script task cancellation accepted: taskId={}", taskId);
+                lifecycleEffects.cancelling(taskId, Instant.now());
+            } else {
+                LOGGER.debug("Script task cancellation ignored: taskId={} reason=terminal_or_cancelling", taskId);
+            }
+            return cancelled;
         }
-        return cancelled;
     }
 
     @Override
