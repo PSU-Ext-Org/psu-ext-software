@@ -11,14 +11,12 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"time"
 
 	"github.com/PSU-Ext-Org/psu-ext-software/psu-install/internal/appconfig"
 	"github.com/PSU-Ext-Org/psu-ext-software/psu-install/internal/release"
 	"github.com/PSU-Ext-Org/psu-ext-software/psu-install/internal/state"
-	"github.com/PSU-Ext-Org/psu-ext-software/psu-install/internal/systemd"
 )
 
 const defaultReleaseBaseURL = "https://github.com/PSU-Ext-Org/psu-ext-software/releases"
@@ -26,6 +24,7 @@ const defaultReleaseBaseURL = "https://github.com/PSU-Ext-Org/psu-ext-software/r
 // Manager owns one end-user PSU-EXT installation.
 type Manager struct {
 	home           string
+	platform       string
 	releaseBaseURL string
 	client         *http.Client
 	stdout         io.Writer
@@ -34,8 +33,9 @@ type Manager struct {
 // NewManager creates a manager for the current user's installation. PSU_EXT_HOME
 // and PSU_EXT_RELEASE_BASE_URL are test and enterprise deployment overrides.
 func NewManager() (*Manager, error) {
-	if runtime.GOOS != "linux" {
-		return nil, fmt.Errorf("%s is not supported yet; Linux is the first supported platform", runtime.GOOS)
+	platform, err := releasePlatform()
+	if err != nil {
+		return nil, err
 	}
 	installHome, err := os.UserHomeDir()
 	if err != nil {
@@ -52,6 +52,7 @@ func NewManager() (*Manager, error) {
 	}
 	return &Manager{
 		home:           installHome,
+		platform:       platform,
 		releaseBaseURL: strings.TrimRight(baseURL, "/"),
 		client:         &http.Client{Timeout: 10 * time.Minute},
 		stdout:         os.Stdout,
@@ -72,7 +73,7 @@ func (m *Manager) Install(ctx context.Context, version string) error {
 	if tag == "" {
 		tag = "latest"
 	}
-	manifest, err := release.FetchManifest(ctx, m.client, m.releaseURL(tag, "release-manifest.json"))
+	manifest, err := release.FetchManifest(ctx, m.client, m.releaseURL(tag, "release-manifest.json"), m.platform)
 	if err != nil {
 		return err
 	}
@@ -87,23 +88,23 @@ func (m *Manager) Install(ctx context.Context, version string) error {
 	if err := appconfig.Write(m.home, releaseDir, current); err != nil {
 		return err
 	}
-	if err := release.Activate(m.home, releaseDir); err != nil {
+	if err := activateRelease(m.home, releaseDir); err != nil {
 		return err
 	}
-	if err := systemd.Install(m.home); err != nil {
+	if err := installServices(m.home); err != nil {
 		return err
 	}
 	fmt.Fprintf(m.stdout, "Installed PSU-EXT %s. Run 'psu-ext start' to launch it.\n", manifest.Version)
 	return nil
 }
 
-// ServiceCommand invokes the complete systemd user-service set.
+// ServiceCommand invokes the complete platform service set.
 func (m *Manager) ServiceCommand(ctx context.Context, command string) error {
 	current, err := state.Load(filepath.Join(m.home, "install-state.json"))
 	if err != nil {
 		return fmt.Errorf("PSU-EXT is not installed: %w", err)
 	}
-	if err := systemd.Command(ctx, m.stdout, command); err != nil {
+	if err := commandServices(ctx, m.stdout, command); err != nil {
 		return err
 	}
 	if command == "start" {
@@ -112,9 +113,9 @@ func (m *Manager) ServiceCommand(ctx context.Context, command string) error {
 	return nil
 }
 
-// Logs streams journal entries for one service or for the complete stack.
+// Logs streams entries for one service or for the complete stack.
 func (m *Manager) Logs(ctx context.Context, service string) error {
-	return systemd.Logs(ctx, m.stdout, service)
+	return serviceLogs(ctx, m.stdout, m.home, service)
 }
 
 func loadOrCreateState(path string) (state.State, error) {
@@ -126,19 +127,19 @@ func loadOrCreateState(path string) (state.State, error) {
 }
 
 func (m *Manager) downloadRelease(ctx context.Context, tag string, manifest release.Manifest) (string, error) {
-	asset := manifest.Assets["linux-amd64"]
+	asset := manifest.Assets[m.platform]
 	releaseDir := filepath.Join(m.home, "releases", manifest.Version)
 	if _, err := os.Stat(releaseDir); os.IsNotExist(err) {
 		archive := filepath.Join(m.home, "releases", asset.Name)
 		if err := release.DownloadVerified(ctx, m.client, m.releaseURL(tag, asset.Name), archive, asset.SHA256); err != nil {
 			return "", err
 		}
-		if err := release.ExtractTarGz(archive, releaseDir); err != nil {
+		if err := extractRelease(archive, releaseDir); err != nil {
 			return "", err
 		}
 		_ = os.Remove(archive)
 	}
-	if err := release.Validate(releaseDir); err != nil {
+	if err := validateRelease(releaseDir); err != nil {
 		return "", err
 	}
 	return releaseDir, nil

@@ -19,7 +19,7 @@ func TestFetchManifest(t *testing.T) {
 	}))
 	defer server.Close()
 
-	manifest, err := release.FetchManifest(context.Background(), server.Client(), server.URL)
+	manifest, err := release.FetchManifest(context.Background(), server.Client(), server.URL, "linux-amd64")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -34,7 +34,33 @@ func TestFetchManifestRejectsInvalidChecksum(t *testing.T) {
 	}))
 	defer server.Close()
 
-	if _, err := release.FetchManifest(context.Background(), server.Client(), server.URL); err == nil {
+	if _, err := release.FetchManifest(context.Background(), server.Client(), server.URL, "linux-amd64"); err == nil {
 		t.Fatal("expected invalid checksum error")
+	}
+}
+
+func TestFetchManifestSelectsPlatform(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, _ *http.Request) {
+		_, _ = response.Write([]byte(`{"version":"1.2.3","assets":{"darwin-arm64":{"name":"mac.tar.gz","sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}}}`))
+	}))
+	defer server.Close()
+
+	manifest, err := release.FetchManifest(context.Background(), server.Client(), server.URL, "darwin-arm64")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if manifest.Assets["darwin-arm64"].Name != "mac.tar.gz" {
+		t.Fatalf("unexpected assets: %#v", manifest.Assets)
+	}
+}
+
+func TestFetchManifestRejectsMissingPlatform(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, _ *http.Request) {
+		_, _ = response.Write([]byte(`{"version":"1.2.3","assets":{"linux-amd64":{"name":"linux.tar.gz","sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}}}`))
+	}))
+	defer server.Close()
+
+	if _, err := release.FetchManifest(context.Background(), server.Client(), server.URL, "darwin-arm64"); err == nil {
+		t.Fatal("expected missing platform error")
 	}
 }

@@ -1,3 +1,4 @@
 script-definitions
 script-storage
 devices.json
+__pycache__/

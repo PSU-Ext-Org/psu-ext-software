@@ -28,7 +28,7 @@ type ManifestAsset struct {
 }
 
 // FetchManifest downloads and validates a release manifest.
-func FetchManifest(ctx context.Context, client *http.Client, url string) (Manifest, error) {
+func FetchManifest(ctx context.Context, client *http.Client, url, platform string) (Manifest, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return Manifest{}, err
@@ -45,12 +45,12 @@ func FetchManifest(ctx context.Context, client *http.Client, url string) (Manife
 	if err := json.NewDecoder(io.LimitReader(response.Body, 1024*1024)).Decode(&manifest); err != nil {
 		return Manifest{}, fmt.Errorf("decode manifest: %w", err)
 	}
-	asset := manifest.Assets["linux-amd64"]
+	asset := manifest.Assets[platform]
 	if manifest.Version == "" || asset.Name == "" {
-		return Manifest{}, fmt.Errorf("manifest has no linux-amd64 release asset")
+		return Manifest{}, fmt.Errorf("manifest has no %s release asset", platform)
 	}
 	if _, err := hex.DecodeString(asset.SHA256); err != nil || len(asset.SHA256) != 64 {
-		return Manifest{}, fmt.Errorf("manifest has invalid linux-amd64 SHA-256")
+		return Manifest{}, fmt.Errorf("manifest has invalid %s SHA-256", platform)
 	}
 	return manifest, nil
 }

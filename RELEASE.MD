@@ -70,9 +70,14 @@ contains:
 ```text
 psu-ext-linux-amd64
 psu-ext-bundle-linux-amd64.tar.gz
+psu-ext-darwin-arm64
+psu-ext-bundle-darwin-arm64.tar.gz
 release-manifest.json
 checksums.txt
 ```
+
+Confirm that `release-manifest.json` contains both `linux-amd64` and
+`darwin-arm64`. Initial macOS artifacts are unsigned.
 
 Published tags are immutable. Fix a published release by preparing and tagging
 a new patch version.

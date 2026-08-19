@@ -53,18 +53,35 @@ jobs:
       - name: Build
         run: npm run build
 
-  installer-test:
-    name: "Installer (Go) Test"
+  installer-platforms:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: psu-install
+    outputs:
+      matrix: ${{ steps.platforms.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test platform descriptors and release metadata
+        run: python3 -m unittest discover -s psu-install/scripts -p "test_*.py"
+      - name: Discover installer platforms
+        id: platforms
+        run: python3 psu-install/scripts/platform-matrix.py psu-install/platforms >> "$GITHUB_OUTPUT"
+
+  installer-test:
+    name: "Installer (${{ matrix.platform }}) Test"
+    needs: installer-platforms
+    strategy:
+      matrix: ${{ fromJSON(needs.installer-platforms.outputs.matrix) }}
+    runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version: "1.25.x"
       - name: Check formatting
+        if: runner.os == 'Linux'
+        working-directory: psu-install
         run: test -z "$(gofmt -l .)"
+      - name: Check bootstrap scripts
+        run: ${{ matrix.checkBootstrap }}
       - name: Run tests
+        working-directory: psu-install
         run: go test ./...

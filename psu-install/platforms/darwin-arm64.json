@@ -1,0 +1,18 @@
+{
+  "platform": "darwin-arm64",
+  "runner": "macos-14",
+  "assemble": "bash psu-install/scripts/assemble-macos.sh \"$PSU_EXT_RELEASE_VERSION\"",
+  "checkBootstrap": "sh -n psu-install/install-macos.sh",
+  "installer": "psu-ext-darwin-arm64",
+  "bundle": "psu-ext-bundle-darwin-arm64.tar.gz",
+  "components": {
+    "caddy": {
+      "url": "https://github.com/caddyserver/caddy/releases/download/v2.10.2/caddy_2.10.2_mac_arm64.tar.gz",
+      "sha512": "3b8a4b24054bddd96cae8da5c34e48c19105be29859d6f09e37344b7e188881cfd6b0a91af3f3e8f1d10987153e6bad70d1752c967e1360cc0041fc7736076ec"
+    },
+    "temurin": {
+      "url": "https://github.com/adoptium/temurin25-binaries/releases/download/jdk-25.0.1%2B8/OpenJDK25U-jdk_aarch64_mac_hotspot_25.0.1_8.tar.gz",
+      "sha256": "964ffce1ff9f24e8d29df4e4201b5b96499026dc8387cf35bb39fe969ffea2bb"
+    }
+  }
+}

@@ -8,23 +8,18 @@ permissions:
   contents: write
 
 jobs:
-  linux-release:
+  prepare:
     runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.platforms.outputs.matrix }}
+      version: ${{ steps.version.outputs.value }}
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: "25"
-          cache: maven
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
           cache: npm
           cache-dependency-path: psu-fe/package-lock.json
-      - uses: actions/setup-go@v5
-        with:
-          go-version: "1.25.x"
       - name: Verify release versions
         shell: bash
         run: |
@@ -53,18 +48,66 @@ jobs:
             echo "::error file=psu-fe/package-lock.json::Expected root package version $version, found $lock_package_version"
             failed=1
           fi
-
           exit "$failed"
+      - name: Discover release platforms
+        id: platforms
+        run: python3 psu-install/scripts/platform-matrix.py psu-install/platforms >> "$GITHUB_OUTPUT"
+      - name: Export release version
+        id: version
+        shell: bash
+        run: echo "value=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+  build-release-assets:
+    needs: prepare
+    strategy:
+      matrix: ${{ fromJSON(needs.prepare.outputs.matrix) }}
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+          cache: maven
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: psu-fe/package-lock.json
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25.x"
       - name: Test installer
         working-directory: psu-install
         run: go test ./...
-      - name: Assemble Linux bundle
-        run: bash psu-install/scripts/assemble-linux.sh "${GITHUB_REF_NAME#v}"
-      - name: Build installer binary
-        working-directory: psu-install
-        run: go build -trimpath -ldflags='-s -w' -o dist/psu-ext-linux-amd64 ./cmd/psu-ext
-      - name: Add installer checksum
-        run: cd psu-install/dist && sha256sum psu-ext-linux-amd64 >> checksums.txt
+      - name: Assemble ${{ matrix.platform }} release
+        env:
+          PSU_EXT_RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
+        run: ${{ matrix.assemble }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.platform }}-release-assets
+          path: |
+            psu-install/dist/${{ matrix.installer }}
+            psu-install/dist/${{ matrix.bundle }}
+          if-no-files-found: error
+
+  publish:
+    needs: build-release-assets
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: "*-release-assets"
+          path: psu-install/dist
+          merge-multiple: true
+      - name: Generate and verify release metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 psu-install/scripts/generate-release-metadata.py --require-all "${GITHUB_REF_NAME#v}" psu-install/dist
+          (cd psu-install/dist && sha256sum --check checksums.txt)
       - name: Publish GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
