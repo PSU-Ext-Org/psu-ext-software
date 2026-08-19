@@ -3,12 +3,12 @@
 # SPDX-License-Identifier: Apache-2.0
 set -euo pipefail
 
-version="${1:?usage: assemble-linux.sh VERSION}"
+version="${1:?usage: assemble-macos.sh VERSION}"
 root="$(cd "$(dirname "$0")/../.." && pwd)"
-work="$root/psu-install/build/linux-amd64"
-bundle="$work/psu-ext-bundle-linux-amd64"
+work="$root/psu-install/build/darwin-arm64"
+bundle="$work/psu-ext-bundle-darwin-arm64"
 dist="$root/psu-install/dist"
-descriptor="$root/psu-install/platforms/linux-amd64.json"
+descriptor="$root/psu-install/platforms/darwin-arm64.json"
 platform_value="$root/psu-install/scripts/platform-value.py"
 caddy_url="$(python3 "$platform_value" "$descriptor" components.caddy.url)"
 caddy_sha512="$(python3 "$platform_value" "$descriptor" components.caddy.sha512)"
@@ -19,14 +19,21 @@ verify_executable_jar() {
     python3 - "$1" <<'PY'
 import sys, zipfile
 
-path = sys.argv[1]
-with zipfile.ZipFile(path) as archive:
+with zipfile.ZipFile(sys.argv[1]) as archive:
     manifest = archive.read("META-INF/MANIFEST.MF").decode("utf-8")
 if "Main-Class: org.springframework.boot.loader.launch.JarLauncher" not in manifest:
-    raise SystemExit(f"{path} is not an executable Spring Boot JAR: missing Main-Class")
+    raise SystemExit(f"{sys.argv[1]} is not an executable Spring Boot JAR")
 if "Start-Class: " not in manifest:
-    raise SystemExit(f"{path} is not an executable Spring Boot JAR: missing Start-Class")
+    raise SystemExit(f"{sys.argv[1]} has no Spring Boot Start-Class")
 PY
+}
+
+verify_checksum() {
+    algorithm="$1"
+    expected="$2"
+    path="$3"
+    actual="$(shasum -a "$algorithm" "$path" | awk '{print $1}')"
+    [ "$actual" = "$expected" ] || { echo "checksum mismatch for $path" >&2; exit 1; }
 }
 
 rm -rf "$work" "$dist"
@@ -47,17 +54,16 @@ cp -R dist/. "$bundle/frontend/"
 popd >/dev/null
 
 curl --fail --location --silent --show-error "$caddy_url" --output "$work/caddy.tar.gz"
-echo "$caddy_sha512  $work/caddy.tar.gz" | sha512sum --check --status
+verify_checksum 512 "$caddy_sha512" "$work/caddy.tar.gz"
 tar -xzf "$work/caddy.tar.gz" -C "$bundle/bin" caddy LICENSE
 curl --fail --location --silent --show-error "$temurin_url" --output "$work/temurin.tar.gz"
-echo "$temurin_sha256  $work/temurin.tar.gz" | sha256sum --check --status
-tar -xzf "$work/temurin.tar.gz" --strip-components=1 -C "$bundle/runtime"
+verify_checksum 256 "$temurin_sha256" "$work/temurin.tar.gz"
+# A macOS JDK archive stores the runtime below <jdk>/Contents/Home.
+tar -xzf "$work/temurin.tar.gz" --strip-components=3 -C "$bundle/runtime"
 cp "$bundle/bin/LICENSE" "$bundle/licenses/CADDY-LICENSE"
 cp -R "$bundle/runtime/legal" "$bundle/licenses/temurin-legal"
 cp "$root/psu-install/THIRD-PARTY-NOTICES.md" "$bundle/licenses/THIRD-PARTY-NOTICES.md"
 
-# The installer deliberately accepts only directories and regular files. Materialize
-# links from the bundled JDK so the release archive preserves that extraction contract.
-tar --dereference --hard-dereference -C "$bundle" -czf "$dist/psu-ext-bundle-linux-amd64.tar.gz" .
-(cd "$root/psu-install" && go build -trimpath -ldflags='-s -w' -o dist/psu-ext-linux-amd64 ./cmd/psu-ext)
+tar -chzf "$dist/psu-ext-bundle-darwin-arm64.tar.gz" -C "$bundle" .
+(cd "$root/psu-install" && GOOS=darwin GOARCH=arm64 go build -trimpath -ldflags='-s -w' -o dist/psu-ext-darwin-arm64 ./cmd/psu-ext)
 python3 "$root/psu-install/scripts/generate-release-metadata.py" "$version" "$dist"

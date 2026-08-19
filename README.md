@@ -26,23 +26,23 @@
   PC-side script runner for hardware automation.
 - [`psu-fe/`](psu-fe/README.MD) — Vite + React frontend: the operator
   dashboard and device configuration UI.
-- [`psu-install/`](psu-install/) — Go-based Linux installer and `psu-ext`
-  command-line manager. It installs a user-local release under `~/.psu-ext`,
-  manages the Proxy, Script Runner, and Caddy services, and preserves device
-  and script data between updates.
+- [`psu-install/`](psu-install/) — Go-based Linux and Apple Silicon macOS
+  installer and `psu-ext` command-line manager. It installs a user-local
+  release under `~/.psu-ext`, manages the Proxy, Script Runner, and Caddy
+  services, and preserves device and script data between updates.
 
 ## Installation
 
-Linux release assets include a native `psu-ext` command. After installing the
-command, run `psu-ext install` to download and configure the local stack, then
-`psu-ext start` to launch it. The command prints the browser URL and also
-supports `stop`, `status`, `logs`, and `update`.
+Linux and Apple Silicon macOS release assets include a native `psu-ext` command.
+After installing the command, run `psu-ext install` to download and configure
+the local stack, then `psu-ext start` to launch it. The command prints the
+browser URL and also supports `stop`, `status`, `logs`, and `update`.
 
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the DCO sign-off requirement and
 third-party notice conventions. Repository maintainers should follow
-[RELEASE.MD](RELEASE.MD) when publishing tagged Linux releases.
+[RELEASE.MD](RELEASE.MD) when publishing tagged releases.
 
 ## License
 

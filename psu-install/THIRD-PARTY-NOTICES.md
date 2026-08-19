@@ -15,7 +15,8 @@ license and notice material plus the source offer referenced in
 | Caddy | Apache-2.0 | Bundled unmodified as the local frontend and reverse-proxy server. |
 | Eclipse Temurin 25 | GPL-2.0-only WITH Classpath-exception-2.0 | Bundled unmodified as the Java runtime. Its `legal/` directory and source offer are included in each release archive. |
 
-The values in `components.json` are release locks. Updating a component requires
-updating its version, URL, SHA-256, and this notice after independently verifying
-the upstream release checksum. The release assembly script copies this document
-and the component license materials into every installer bundle.
+`components.json` records shared component versions and licensing metadata.
+Platform-specific URLs and checksums are release locks in `platforms/*.json`.
+Updating a component requires updating both sources after independently
+verifying the upstream checksum. Each assembly script copies this document and
+the component license materials into its installer bundle.
