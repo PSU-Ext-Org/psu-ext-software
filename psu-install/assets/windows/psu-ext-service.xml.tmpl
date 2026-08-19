@@ -1,0 +1,7 @@
+<!-- Future Windows Service Control Manager adapter template. -->
+<service>
+  <id>psu-ext-{{ .Service }}</id>
+  <name>PSU-EXT {{ .DisplayName }}</name>
+  <executable>{{ .ReleaseDirectory }}\\runtime\\bin\\java.exe</executable>
+  <arguments>-jar {{ .ReleaseDirectory }}\\apps\\{{ .Jar }} --spring.config.additional-location=file:{{ .ConfigFile }}</arguments>
+</service>

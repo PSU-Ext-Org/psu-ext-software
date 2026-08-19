@@ -21,6 +21,7 @@ package com.psuext.proxy.config;
  */
 
 import com.psuext.proxy.ws.ScpiWebSocketHandler;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.socket.config.annotation.EnableWebSocket;
 import org.springframework.web.socket.config.annotation.WebSocketConfigurer;
@@ -34,9 +35,13 @@ import org.springframework.web.socket.config.annotation.WebSocketHandlerRegistry
 public class WebSocketConfig implements WebSocketConfigurer {
 
     private final ScpiWebSocketHandler scpiWebSocketHandler;
+    private final String allowedOrigin;
 
-    public WebSocketConfig(ScpiWebSocketHandler scpiWebSocketHandler) {
+    public WebSocketConfig(
+            ScpiWebSocketHandler scpiWebSocketHandler,
+            @Value("${psu.web.cors.allowed-origin:*}") String allowedOrigin) {
         this.scpiWebSocketHandler = scpiWebSocketHandler;
+        this.allowedOrigin = allowedOrigin;
     }
 
     /**
@@ -47,6 +52,6 @@ public class WebSocketConfig implements WebSocketConfigurer {
     @Override
     public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
         registry.addHandler(scpiWebSocketHandler, "/ws/scpi")
-                .setAllowedOriginPatterns("*");
+                .setAllowedOrigins(allowedOrigin);
     }
 }

@@ -22,7 +22,7 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: "17"
+          java-version: "25"
           cache: maven
       - name: Check license headers
         run: ./mvnw -B validate
@@ -52,3 +52,19 @@ jobs:
         run: npm run test
       - name: Build
         run: npm run build
+
+  installer-test:
+    name: "Installer (Go) Test"
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: psu-install
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25.x"
+      - name: Check formatting
+        run: test -z "$(gofmt -l .)"
+      - name: Run tests
+        run: go test ./...

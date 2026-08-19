@@ -28,3 +28,9 @@ See psu-be/THIRD-PARTY-NOTICES.md for the full list of psu-be's direct
 dependencies and their licenses. Other subprojects added to this repository
 in the future (e.g. a frontend) maintain their own THIRD-PARTY-NOTICES.md
 scoped to their own dependency ecosystem.
+
+The optional psu-install release bundle additionally includes the unmodified
+Caddy web server (Apache-2.0) and Eclipse Temurin 25 runtime (GPLv2 with the
+Classpath Exception). Each bundle retains their required license and notice
+materials. See psu-install/THIRD-PARTY-NOTICES.md for the installer-specific
+notice, component source references, and release-lock maintenance guidance.

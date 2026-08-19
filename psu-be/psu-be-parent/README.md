@@ -14,7 +14,8 @@ modules.
 - Java release: `17`
 - Compiler plugin: `maven-compiler-plugin`
 - Test runner: `maven-surefire-plugin`
-- Spring Boot packaging/run support: `spring-boot-maven-plugin`
+- Spring Boot packaging/run support: `spring-boot-maven-plugin`; application
+  modules that declare it produce executable JARs during `package`
 
 ## Usage
 

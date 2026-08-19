@@ -13,6 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+import { getRuntimeWebSocketDefaults } from "../../runtime/runtimeConfig.js";
+
 export const CONFIG_KEY = "psu-fe.config";
 
 export const EMPTY_CONFIG = {
@@ -38,7 +40,7 @@ export function loadConfig() {
   try {
     const saved = JSON.parse(localStorage.getItem(CONFIG_KEY));
     if (!saved || typeof saved !== "object") {
-      return EMPTY_CONFIG;
+      return defaultConfig();
     }
 
     const wsDeviceAutoConnectIds = Array.isArray(saved.wsDeviceAutoConnectIds)
@@ -54,8 +56,20 @@ export function loadConfig() {
       wsDeviceAutoConnectIds,
     };
   } catch {
-    return EMPTY_CONFIG;
+    return defaultConfig();
   }
+}
+
+/**
+ * Returns installer-provided endpoint defaults without changing browser-saved settings.
+ *
+ * @returns {typeof EMPTY_CONFIG}
+ */
+function defaultConfig() {
+  return {
+    ...EMPTY_CONFIG,
+    ...getRuntimeWebSocketDefaults(),
+  };
 }
 
 /**
