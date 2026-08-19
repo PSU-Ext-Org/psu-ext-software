@@ -1,0 +1,71 @@
+name: Release installer
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  linux-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+          cache: maven
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: psu-fe/package-lock.json
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25.x"
+      - name: Verify release versions
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          failed=0
+
+          while IFS= read -r -d '' pom; do
+            declared="$(sed -n '/<version>/{s:.*<version>\([^<]*\)</version>.*:\1:p;q;}' "$pom")"
+            if [[ "$declared" != "$version" ]]; then
+              echo "::error file=$pom::Expected version $version, found $declared"
+              failed=1
+            fi
+          done < <(find psu-be -name pom.xml -not -path '*/target/*' -print0)
+
+          for package_file in psu-fe/package.json psu-fe/package-lock.json; do
+            declared="$(node -p "require('./$package_file').version")"
+            if [[ "$declared" != "$version" ]]; then
+              echo "::error file=$package_file::Expected version $version, found $declared"
+              failed=1
+            fi
+          done
+
+          lock_package_version="$(node -p "require('./psu-fe/package-lock.json').packages[''].version")"
+          if [[ "$lock_package_version" != "$version" ]]; then
+            echo "::error file=psu-fe/package-lock.json::Expected root package version $version, found $lock_package_version"
+            failed=1
+          fi
+
+          exit "$failed"
+      - name: Test installer
+        working-directory: psu-install
+        run: go test ./...
+      - name: Assemble Linux bundle
+        run: bash psu-install/scripts/assemble-linux.sh "${GITHUB_REF_NAME#v}"
+      - name: Build installer binary
+        working-directory: psu-install
+        run: go build -trimpath -ldflags='-s -w' -o dist/psu-ext-linux-amd64 ./cmd/psu-ext
+      - name: Add installer checksum
+        run: cd psu-install/dist && sha256sum psu-ext-linux-amd64 >> checksums.txt
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" psu-install/dist/* --generate-notes

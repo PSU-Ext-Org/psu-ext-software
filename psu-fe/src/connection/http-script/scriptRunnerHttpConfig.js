@@ -13,6 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+import { getRuntimeScriptRunnerDefaults } from "../runtime/runtimeConfig.js";
+
 export const SCRIPT_RUNNER_HTTP_CONFIG_KEY = "psu-fe.script-backend.config";
 
 export const EMPTY_SCRIPT_RUNNER_HTTP_CONFIG = {
@@ -31,15 +33,27 @@ export const EMPTY_SCRIPT_RUNNER_HTTP_CONFIG = {
 export function loadScriptRunnerHttpConfig() {
   try {
     const saved = JSON.parse(window.localStorage.getItem(SCRIPT_RUNNER_HTTP_CONFIG_KEY));
-    if (!saved || typeof saved !== "object") return EMPTY_SCRIPT_RUNNER_HTTP_CONFIG;
+    if (!saved || typeof saved !== "object") return defaultConfig();
     return {
       ...EMPTY_SCRIPT_RUNNER_HTTP_CONFIG,
       ...saved,
       autoConnectIds: Array.isArray(saved.autoConnectIds) ? saved.autoConnectIds.map(String) : [],
     };
   } catch {
-    return EMPTY_SCRIPT_RUNNER_HTTP_CONFIG;
+    return defaultConfig();
   }
+}
+
+/**
+ * Returns installer-provided Script Runner defaults without replacing browser-saved settings.
+ *
+ * @returns {typeof EMPTY_SCRIPT_RUNNER_HTTP_CONFIG}
+ */
+function defaultConfig() {
+  return {
+    ...EMPTY_SCRIPT_RUNNER_HTTP_CONFIG,
+    ...getRuntimeScriptRunnerDefaults(),
+  };
 }
 
 /** @param {typeof EMPTY_SCRIPT_RUNNER_HTTP_CONFIG} config */

@@ -1,0 +1,21 @@
+{
+  "caddy": {
+    "version": "2.10.2",
+    "license": "Apache-2.0",
+    "source": "https://github.com/caddyserver/caddy",
+    "linux-amd64": {
+      "url": "https://github.com/caddyserver/caddy/releases/download/v2.10.2/caddy_2.10.2_linux_amd64.tar.gz",
+      "sha512": "747df7ee74de188485157a383633a1a963fd9233b71fbb4a69ddcbcc589ce4e2cc82dacf5dbbe136cb51d17e14c59daeb5d9bc92487610b0f3b93680b2646546"
+    }
+  },
+  "temurin": {
+    "version": "25.0.1+8",
+    "license": "GPL-2.0-only WITH Classpath-exception-2.0",
+    "source": "https://github.com/adoptium/temurin25-binaries",
+    "sourceOffer": "https://github.com/adoptium/temurin25-binaries",
+    "linux-amd64": {
+      "url": "https://github.com/adoptium/temurin25-binaries/releases/download/jdk-25.0.1%2B8/OpenJDK25U-jdk_x64_linux_hotspot_25.0.1_8.tar.gz",
+      "sha256": "8daf77d1aacffe38c9889689bc224a13557de77559d9a5bb91991e6a298baa0d"
+    }
+  }
+}
