@@ -72,12 +72,14 @@ psu-ext-linux-amd64
 psu-ext-bundle-linux-amd64.tar.gz
 psu-ext-darwin-arm64
 psu-ext-bundle-darwin-arm64.tar.gz
+psu-ext-windows-amd64.exe
+psu-ext-bundle-windows-amd64.zip
 release-manifest.json
 checksums.txt
 ```
 
-Confirm that `release-manifest.json` contains both `linux-amd64` and
-`darwin-arm64`. Initial macOS artifacts are unsigned.
+Confirm that `release-manifest.json` contains `linux-amd64`, `darwin-arm64`,
+and `windows-amd64`. Initial macOS and Windows artifacts are unsigned.
 
 ### 6. Prepare the next development iteration
 

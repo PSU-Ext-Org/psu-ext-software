@@ -2,3 +2,5 @@ script-definitions
 script-storage
 devices.json
 __pycache__/
+/psu-install/build/
+/psu-install/dist/

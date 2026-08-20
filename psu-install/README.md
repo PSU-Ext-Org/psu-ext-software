@@ -1,8 +1,9 @@
 # PSU-EXT Installer
 
 `psu-install` contains the native `psu-ext` command-line installer and service
-manager for PSU-EXT. It supports 64-bit Linux with user-level systemd services
-and Apple Silicon macOS with per-user launch agents.
+manager for PSU-EXT. It supports 64-bit Linux with user-level systemd services,
+Apple Silicon macOS with per-user launch agents, and Windows 11 x64 with
+per-user Task Scheduler tasks.
 
 The installer downloads a checksum-verified application bundle from GitHub
 Releases, stores the installed software and user data under `~/.psu-ext`, and
@@ -28,6 +29,21 @@ verifies its SHA-256 checksum, and installs it as `$HOME/.local/bin/psu-ext`.
 It does not download or start the application bundle; `psu-ext install` performs
 that step afterward.
 
+On Windows 11 x64, download and run the PowerShell bootstrap:
+
+```powershell
+Invoke-WebRequest `
+  https://raw.githubusercontent.com/PSU-Ext-Org/psu-ext-software/main/psu-install/install-windows.ps1 `
+  -OutFile install-windows.ps1
+pwsh -NoProfile -File .\install-windows.ps1
+```
+
+It installs the CLI as
+`%LOCALAPPDATA%\Programs\PSU-EXT\psu-ext.exe` by default. The initial Windows
+binary is unsigned, so Windows SmartScreen approval may be required. Add the
+installation directory to `PATH`, then use the same `psu-ext install` and
+`psu-ext start` commands as on Linux and macOS.
+
 Ensure `$HOME/.local/bin` is on `PATH`, then install and start PSU-EXT:
 
 ```sh
@@ -50,9 +66,12 @@ psu-ext logs [proxy|runner|caddy]
 psu-ext update
 ```
 
-`install` registers user-level systemd units or macOS launch agents but
-deliberately leaves them stopped. `update` downloads the latest release while
-preserving device profiles, scripts, results, ports, and other user data.
+`install` registers user-level systemd units, macOS launch agents, or Windows
+scheduled tasks but deliberately leaves them stopped. `update` downloads the
+latest release while preserving device profiles, scripts, results, ports, and
+other user data. On Windows, Task Scheduler ends processes directly, so
+`psu-ext stop` interrupts any active script task. Failed Windows tasks restart
+up to three times at Task Scheduler's minimum one-minute interval.
 
 ## Installed layout
 
@@ -64,7 +83,7 @@ preserving device profiles, scripts, results, ports, and other user data.
 │   ├── script-definitions/
 │   └── script-storage/
 ├── releases/<version>/      # Immutable versioned application bundles
-├── current                  # Symlink to the active release
+├── current                  # Unix symlink to the active release
 ├── logs/
 └── install-state.json       # Active version and allocated local ports
 ```
@@ -82,8 +101,9 @@ internal/release   Release manifests, downloads, checksums, and archive handling
 internal/state     Persistent state, data layout, and port allocation
 internal/systemd   Linux user-service installation and lifecycle
 internal/launchd   macOS launch-agent installation and lifecycle
+internal/taskscheduler Windows scheduled-task installation and lifecycle
+internal/logtail   Portable file-log following for Windows
 platforms/         Additive target descriptors used by CI and release tooling
-assets/            Future Windows service template
 scripts/           Platform assembly and shared release tooling
 third-party/       Shared bundled-component versions and licensing metadata
 ```
@@ -119,13 +139,19 @@ On Apple Silicon macOS, use the equivalent assembly script:
 bash psu-install/scripts/assemble-macos.sh 1.2.3
 ```
 
+On Windows 11 x64, use:
+
+```powershell
+pwsh -NoProfile -File psu-install/scripts/assemble-windows.ps1 1.2.3
+```
+
 Outputs are written to `psu-install/dist/`. Tagged releases are assembled and
 published by `.github/workflows/release.yml`. Each file under `platforms/` pins
 that target's component downloads and checksums; `third-party/components.json`
 holds shared component versions, licenses, and source references.
 
-For local release testing, set `PSU_EXT_RELEASE_BASE_URL` on either platform to
-an HTTP server that exposes the same `/latest/download/...` or
+For local release testing, set `PSU_EXT_RELEASE_BASE_URL` on any platform to an
+HTTP server that exposes the same `/latest/download/...` or
 `/download/<tag>/...` paths as GitHub Releases. The installer still reads
 `release-manifest.json` and verifies the selected bundle checksum.
 
@@ -142,9 +168,11 @@ automatically; existing platform files do not need edits.
 
 - Linux x86-64: supported using user-level systemd services.
 - macOS ARM64: supported using per-user launch agents.
+- Windows 11 x64: supported using three triggerless, per-user scheduled tasks.
 - Linux ARM64: configuration mapping exists, but release bundles are not yet published.
-- Windows and Intel macOS: not currently supported.
+- Windows ARM64 and Intel macOS: not currently supported.
 - macOS release binaries are unsigned and may require approval in Privacy & Security on first launch.
+- Windows release binaries are unsigned and may require SmartScreen approval.
 - LAN access and authentication are not enabled; the installed stack is local-only.
 
 ## Licensing

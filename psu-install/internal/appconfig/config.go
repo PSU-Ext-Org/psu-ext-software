@@ -49,6 +49,9 @@ func writeRuntimeConfig(configDir string, current state.State) error {
 }
 
 func writeCaddyConfig(configDir, release string, current state.State) error {
+	if runtime.GOOS == "windows" {
+		return writeWindowsCaddyConfig(filepath.Dir(configDir), configDir, release, current)
+	}
 	caddy := fmt.Sprintf(`http://localhost:%d {
 	route {
 		handle /runtime-config.json {

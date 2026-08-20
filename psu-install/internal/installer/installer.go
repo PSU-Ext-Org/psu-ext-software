@@ -104,7 +104,7 @@ func (m *Manager) ServiceCommand(ctx context.Context, command string) error {
 	if err != nil {
 		return fmt.Errorf("PSU-EXT is not installed: %w", err)
 	}
-	if err := commandServices(ctx, m.stdout, command); err != nil {
+	if err := commandServices(ctx, m.stdout, m.home, command); err != nil {
 		return err
 	}
 	if command == "start" {

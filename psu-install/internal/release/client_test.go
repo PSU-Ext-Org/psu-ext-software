@@ -7,10 +7,33 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"testing"
 
 	"github.com/PSU-Ext-Org/psu-ext-software/psu-install/internal/release"
 )
+
+func TestDownloadVerifiedRejectsChecksumMismatchAndHTTPError(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		status int
+	}{
+		{name: "checksum mismatch", status: http.StatusOK},
+		{name: "HTTP error", status: http.StatusNotFound},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, _ *http.Request) {
+				response.WriteHeader(test.status)
+				_, _ = response.Write([]byte("unexpected"))
+			}))
+			defer server.Close()
+			target := filepath.Join(t.TempDir(), "bundle.zip")
+			if err := release.DownloadVerified(context.Background(), server.Client(), server.URL, target, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"); err == nil {
+				t.Fatal("expected download error")
+			}
+		})
+	}
+}
 
 func TestFetchManifest(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, _ *http.Request) {
