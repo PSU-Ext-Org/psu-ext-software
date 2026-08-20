@@ -79,5 +79,36 @@ checksums.txt
 Confirm that `release-manifest.json` contains both `linux-amd64` and
 `darwin-arm64`. Initial macOS artifacts are unsigned.
 
+### 6. Prepare the next development iteration
+
+After the release workflow succeeds, choose the next version with a
+`-SNAPSHOT` suffix:
+
+```sh
+export NEXT_VERSION=0.1.1-SNAPSHOT
+```
+
+Update the Java and JavaScript versions from the repository root:
+
+```sh
+cd psu-be
+./mvnw -q versions:set \
+  -DnewVersion="$NEXT_VERSION" \
+  -DprocessAllModules=true \
+  -DgenerateBackupPoms=false
+cd ../psu-fe
+npm version "$NEXT_VERSION" --no-git-tag-version --allow-same-version
+cd ..
+```
+
+Review, commit, and push the next-iteration versions:
+
+```sh
+git diff
+git add psu-be psu-fe/package.json psu-fe/package-lock.json
+git commit -s -S -m "Software/PSU-REL: Start $NEXT_VERSION development iteration"
+git push origin main
+```
+
 Published tags are immutable. Fix a published release by preparing and tagging
 a new patch version.
