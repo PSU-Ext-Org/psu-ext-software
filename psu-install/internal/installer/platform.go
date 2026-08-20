@@ -13,9 +13,10 @@ import (
 )
 
 type serviceAdapter struct {
-	install func(home string) error
-	command func(ctx context.Context, output io.Writer, command string) error
-	logs    func(ctx context.Context, output io.Writer, home, service string) error
+	install         func(home string) error
+	command         func(ctx context.Context, output io.Writer, command string) error
+	commandWithHome func(ctx context.Context, output io.Writer, home, command string) error
+	logs            func(ctx context.Context, output io.Writer, home, service string) error
 }
 
 type platformAdapter struct {
@@ -58,7 +59,10 @@ func installServices(home string) error {
 	return activePlatform.services.install(home)
 }
 
-func commandServices(ctx context.Context, output io.Writer, command string) error {
+func commandServices(ctx context.Context, output io.Writer, home, command string) error {
+	if activePlatform.services.commandWithHome != nil {
+		return activePlatform.services.commandWithHome(ctx, output, home, command)
+	}
 	return activePlatform.services.command(ctx, output, command)
 }
 

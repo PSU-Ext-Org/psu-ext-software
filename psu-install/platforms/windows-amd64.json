@@ -1,0 +1,18 @@
+{
+  "platform": "windows-amd64",
+  "runner": "windows-latest",
+  "assemble": "pwsh -NoProfile -File psu-install/scripts/assemble-windows.ps1 $env:PSU_EXT_RELEASE_VERSION",
+  "checkBootstrap": "pwsh -NoProfile -File psu-install/scripts/check-powershell.ps1 psu-install/install-windows.ps1 psu-install/scripts/assemble-windows.ps1; python psu-install/scripts/test_install_windows.py",
+  "installer": "psu-ext-windows-amd64.exe",
+  "bundle": "psu-ext-bundle-windows-amd64.zip",
+  "components": {
+    "caddy": {
+      "url": "https://github.com/caddyserver/caddy/releases/download/v2.10.2/caddy_2.10.2_windows_amd64.zip",
+      "sha512": "88347875f0cd4b5e26bb39cd1f359613f932d54158d560e03244004d1ba6e61aae0cd625ba7c913bd46df096ef973fef2249396b0bb81143414378cb4447aeb8"
+    },
+    "temurin": {
+      "url": "https://github.com/adoptium/temurin25-binaries/releases/download/jdk-25.0.1%2B8/OpenJDK25U-jdk_x64_windows_hotspot_25.0.1_8.zip",
+      "sha256": "46897db80b6df8fad1f6cccce9e8514210bfd0181085dcd346f5c710a70a0d58"
+    }
+  }
+}

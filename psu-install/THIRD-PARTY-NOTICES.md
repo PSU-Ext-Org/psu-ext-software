@@ -4,11 +4,11 @@ This project (`psu-install`) is licensed under the Apache License, Version 2.0
 (see `../LICENSE`). Its release bundles include the following separate,
 unmodified components.
 
-The release builder bundles Caddy and Eclipse Temurin as separate, unmodified
-components. Caddy is licensed under Apache-2.0. Eclipse Temurin is licensed
-under GPLv2 with the Classpath Exception; each release retains its supplied
-license and notice material plus the source offer referenced in
-`third-party/components.json`.
+The release builder bundles platform-specific Caddy and Eclipse Temurin builds
+as separate, unmodified components. Caddy is licensed under Apache-2.0. Eclipse
+Temurin is licensed under GPLv2 with the Classpath Exception; each release
+retains its supplied license and notice material plus the source offer
+referenced in `third-party/components.json`.
 
 | Component | License | Distribution notes |
 |---|---|---|
