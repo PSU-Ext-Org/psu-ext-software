@@ -15,7 +15,7 @@
  */
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { TimerQueueCard } from "../components/TimerQueueCard.jsx";
+import { TimerQueueCard, TimerQueueCardActions } from "../components/TimerQueueCard.jsx";
 import { WIDGET_CONFIG_STORAGE_KEY } from "../../widgetConfigStore.js";
 
 const mockConnection = vi.hoisted(() => ({
@@ -91,6 +91,76 @@ describe("TimerQueueCard", () => {
     expect(JSON.parse(window.localStorage.getItem(WIDGET_CONFIG_STORAGE_KEY))["timer-main"].timers).toEqual([
       { id: "A01", durationSeconds: "5.000", relayOnAfterExpiry: false },
     ]);
+  });
+
+  it("preserves unsaved timer edits when header settings change metadata and device", async () => {
+    saveConfig("timer-main");
+    mockConnection.devices = [
+      { id: "0", name: "PSU1", type: "TCP" },
+      { id: "1", name: "PSU2", type: "TCP" },
+    ];
+    mockConnection.deviceStatuses = {
+      0: { state: "CONNECTED" },
+      1: { state: "CONNECTED" },
+    };
+
+    render(
+      <>
+        <TimerQueueCardActions placement={{ id: "timer-main" }} />
+        <TimerQueueCard placement={{ id: "timer-main" }} />
+      </>,
+    );
+
+    const durationInput = screen.getByLabelText("Timer duration 1");
+    fireEvent.change(durationInput, { target: { value: "7.000" } });
+    fireEvent.click(screen.getByRole("button", { name: "Configure timer queue card" }));
+    fireEvent.change(screen.getByLabelText("Device"), { target: { value: "PSU2" } });
+    fireEvent.change(screen.getByLabelText("Card name"), { target: { value: "Updated timer queue" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(screen.getByLabelText("Timer duration 1")).toHaveValue("7.000"));
+    expect(screen.getByRole("button", { name: "Save preset" })).toBeEnabled();
+    expect(JSON.parse(window.localStorage.getItem(WIDGET_CONFIG_STORAGE_KEY))["timer-main"]).toMatchObject({
+      cardName: "Updated timer queue",
+      deviceName: "PSU2",
+    });
+  });
+
+  it("ignores an older status response after selecting another device", async () => {
+    saveConfig("timer-main");
+    mockConnection.devices = [
+      { id: "0", name: "PSU1", type: "TCP" },
+      { id: "1", name: "PSU2", type: "TCP" },
+    ];
+    mockConnection.deviceStatuses = {
+      0: { state: "CONNECTED" },
+      1: { state: "CONNECTED" },
+    };
+    const staleResponse = deferred();
+    mockConnection.sendScpiCommand
+      .mockImplementationOnce(() => staleResponse.promise)
+      .mockResolvedValueOnce({ ok: true, response: "A02,PAUSED,2.500" });
+
+    render(
+      <>
+        <TimerQueueCardActions placement={{ id: "timer-main" }} />
+        <TimerQueueCard placement={{ id: "timer-main" }} />
+      </>,
+    );
+
+    await waitFor(() => expect(mockConnection.sendScpiCommand).toHaveBeenCalledTimes(1));
+    fireEvent.click(screen.getByRole("button", { name: "Configure timer queue card" }));
+    fireEvent.change(screen.getByLabelText("Device"), { target: { value: "PSU2" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(mockConnection.sendScpiCommand).toHaveBeenCalledTimes(2));
+    expect(screen.getByTestId("timer-active-timer-main")).toHaveTextContent("A02");
+
+    await act(async () => {
+      staleResponse.resolve({ ok: true, response: "ZZZ,RUNNING,5.000" });
+      await Promise.resolve();
+    });
+
+    expect(screen.getByTestId("timer-active-timer-main")).toHaveTextContent("A02");
   });
 
   it("loads status once on mount and refreshes only on button click", async () => {
@@ -272,4 +342,13 @@ function saveConfig(widgetId) {
       },
     }),
   );
+}
+
+function deferred() {
+  let resolve;
+  const promise = new Promise((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+
+  return { promise, resolve };
 }

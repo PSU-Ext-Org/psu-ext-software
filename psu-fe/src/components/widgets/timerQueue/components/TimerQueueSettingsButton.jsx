@@ -14,32 +14,34 @@
  * limitations under the License.
  */
 import { Settings } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { ValidationMessage } from "../../../forms/ValidationMessage.jsx";
 import { useModalDialog } from "../../../layout/hooks/useModalDialog.js";
 import { useWebSocketConnection } from "../../../../connection/ws-proxy/WebSocketConnectionContext.jsx";
-import { connectedDevices } from "../../../../connection/ws-proxy/device/deviceRegistry.js";
 import {
   DEFAULT_TIMER_QUEUE_CONTROL_CONFIG,
   saveTimerQueueControlConfig,
+  TIMER_QUEUE_CHANNEL,
+  TIMER_QUEUE_LIMITS,
+  TIMER_QUEUE_VALIDATION_MESSAGE,
   useTimerQueueControlConfig,
 } from "../timerQueueConfig.js";
 
+/**
+ * Opens the timer queue device and card metadata settings dialog.
+ *
+ * @param {{iconOnly?: boolean, placement: {id: string}, timers?: Array<object>}} props - Widget placement and optional unsaved timer rows.
+ * @returns {import("react").ReactElement} Settings trigger and dialog.
+ */
 export function TimerQueueSettingsButton({ iconOnly = false, placement, timers }) {
-  const { devices = [], deviceStatuses = {} } = useWebSocketConnection();
+  const { devices = [] } = useWebSocketConnection();
   const [config, setConfig] = useTimerQueueControlConfig(placement.id);
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(config);
   const dialogRef = useModalDialog(open, () => setOpen(false));
-  const connectedTargets = useMemo(
-    () => connectedDevices(devices, deviceStatuses),
-    [devices, deviceStatuses],
-  );
-  const deviceOptions = useMemo(
-    () => (devices.length ? devices : connectedTargets),
-    [connectedTargets, devices],
-  );
-  const validationError = String(draft.deviceName || "").trim() ? "" : "Select a target device.";
+  const validationError = String(draft.deviceName || "").trim()
+    ? ""
+    : TIMER_QUEUE_VALIDATION_MESSAGE.DEVICE_REQUIRED;
 
   useEffect(() => {
     if (!open) {
@@ -74,18 +76,7 @@ export function TimerQueueSettingsButton({ iconOnly = false, placement, timers }
         >
           <form
             className="grid w-full max-w-md gap-4 rounded-lg border border-slate-200 bg-white p-5 shadow-xl"
-            onSubmit={(event) => {
-              event.preventDefault();
-              if (validationError) {
-                return;
-              }
-
-              setConfig(saveTimerQueueControlConfig(placement.id, {
-                ...draft,
-                timers: timers ?? config.timers,
-              }));
-              setOpen(false);
-            }}
+            onSubmit={handleSubmit}
           >
             <div className="flex min-w-0 items-start justify-between gap-4">
               <h3 className="text-lg font-semibold text-slate-950">Timer Queue Settings</h3>
@@ -106,7 +97,7 @@ export function TimerQueueSettingsButton({ iconOnly = false, placement, timers }
                 value={draft.deviceName}
               >
                 <option value="">Select device</option>
-                {deviceOptions.map((deviceOption) => (
+                {devices.map((deviceOption) => (
                   <option key={deviceOption.id} value={deviceOption.name}>
                     {deviceOption.id} / {deviceOption.name}
                   </option>
@@ -125,7 +116,7 @@ export function TimerQueueSettingsButton({ iconOnly = false, placement, timers }
             </label>
 
             <p className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
-              Channel is fixed to CH1. Use only one timer widget per device/channel to avoid queue drift.
+              Channel is fixed to {TIMER_QUEUE_CHANNEL}. Use only one timer widget per device/channel to avoid queue drift.
             </p>
 
             <ValidationMessage message={validationError} />
@@ -156,8 +147,21 @@ export function TimerQueueSettingsButton({ iconOnly = false, placement, timers }
     setDraft((current) => ({
       ...current,
       [key]: key === "cardName"
-        ? String(value).trim().slice(0, 48) || DEFAULT_TIMER_QUEUE_CONTROL_CONFIG.cardName
+        ? String(value).trim().slice(0, TIMER_QUEUE_LIMITS.cardNameMaxLength) || DEFAULT_TIMER_QUEUE_CONTROL_CONFIG.cardName
         : value,
     }));
+  }
+
+  function handleSubmit(event) {
+    event.preventDefault();
+    if (validationError) {
+      return;
+    }
+
+    setConfig(saveTimerQueueControlConfig(placement.id, {
+      ...draft,
+      timers: timers ?? config.timers,
+    }));
+    setOpen(false);
   }
 }
