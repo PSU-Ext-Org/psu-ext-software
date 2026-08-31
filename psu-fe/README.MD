@@ -534,6 +534,17 @@ Chart widgets can also show a per-series statistics panel inside the widget.
 - Each statistic is defined as a dedicated entity under `src/components/widgets/chart/utils/statistics/`, with its own metadata, help text, formatter, and calculation method.
 - Disabled statistics are not calculated.
 
+### Chart Image Export
+
+Dashboard chart headers provide an Export action beside the history-clear and settings actions. Script Runner result-chart dialogs provide the same action beside statistics settings.
+
+- Export is enabled after the chart contains at least one numeric sample.
+- The downloaded PNG captures the currently displayed uPlot range at twice the on-screen resolution. A zoomed chart therefore exports only the visible data.
+- The image includes axes, series, the current legend, target/status and usage text, and any enabled visible-range statistics. Surrounding dashboard-card and dialog chrome is excluded.
+- Click the uPlot chart to lock its current cursor point, crosshair, and legend values before exporting; click it again to unlock the cursor. The locked point and crosshair are included in the PNG.
+- PNG filenames use the chart name (or Script Runner task identifier) and a local timestamp.
+- Image export currently supports only the `uplot` renderer. With `PSU_CHART_RENDERER=svg`, Export displays `Export not supported yet`.
+
 ## Build
 
 ```bash

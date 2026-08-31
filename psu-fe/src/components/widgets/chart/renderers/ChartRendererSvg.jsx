@@ -15,6 +15,7 @@
  */
 import { useEffect, useMemo } from "react";
 import { ChartStatisticsPanel } from "../components/ChartStatisticsPanel.jsx";
+import { useRegisterChartImageExport } from "../export/chartExportRegistry.js";
 import { formatChartTime } from "../utils/chartTimeFormat.js";
 
 const SVG_WIDTH = 640;
@@ -25,6 +26,7 @@ const PLOT = Object.freeze({ left: 42, right: 12, top: 18, bottom: 24 });
  * Lightweight SVG implementation of the chart renderer contract.
  *
  * @param {object} props
+ * @param {{id: string, fileStem: string}} props.chartExport - Runtime export identity and filename source.
  * @param {ChartSeriesData[]} props.seriesData
  * @param {(visibleTimeRange: {minMs: number, maxMs: number} | null) => void} [props.onVisibleTimeRangeChange]
  * @param {{sampleCount?: number, values?: Record<string, number | null>}} props.statistics
@@ -37,6 +39,7 @@ const PLOT = Object.freeze({ left: 42, right: 12, top: 18, bottom: 24 });
  * @returns {import("react").ReactElement}
  */
 export function ChartRenderer({
+  chartExport,
   onVisibleTimeRangeChange,
   seriesData,
   statistics,
@@ -47,8 +50,15 @@ export function ChartRenderer({
   usageText,
   unit,
 }) {
+  const exportId = chartExport.id;
   const chart = useMemo(() => buildChartGeometry(seriesData), [seriesData]);
   const commandText = [targetText, statusText].filter(Boolean).join(" ");
+
+  useRegisterChartImageExport(exportId, {
+    exportPng: null,
+    ready: chart.totalPoints > 0,
+    supported: false,
+  });
 
   useEffect(() => {
     onVisibleTimeRangeChange?.(null);

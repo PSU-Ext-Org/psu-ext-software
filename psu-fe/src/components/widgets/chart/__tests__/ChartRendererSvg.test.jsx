@@ -13,9 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { ChartRenderer } from "../renderers/ChartRendererSvg.jsx";
+import { ChartImageExportButton } from "../components/ChartImageExportButton.jsx";
+import { ChartRenderer as SvgChartRenderer } from "../renderers/ChartRendererSvg.jsx";
+
+const DEFAULT_CHART_EXPORT = Object.freeze({ id: "chart-svg-test", fileStem: "SVG chart" });
+
+function ChartRenderer(props) {
+  return <SvgChartRenderer chartExport={DEFAULT_CHART_EXPORT} {...props} />;
+}
 
 describe("ChartRendererSvg", () => {
   it("renders empty state", () => {
@@ -68,5 +75,24 @@ describe("ChartRendererSvg", () => {
     expect(screen.getByText("1.2 / 256 KiB")).toBeInTheDocument();
     expect(screen.getByTestId("chart-statistics")).toBeInTheDocument();
     expect(screen.getByText("Voltage stats")).toBeInTheDocument();
+  });
+
+  it("registers sampled charts as unsupported for image export", () => {
+    render(
+      <>
+        <ChartImageExportButton exportId="chart-svg" />
+        <ChartRenderer
+          chartExport={{ id: "chart-svg", fileStem: "SVG chart" }}
+          seriesData={[{ id: "voltage", label: "Voltage", color: "#2563eb", points: [{ t: 1000, y: 12 }] }]}
+          statusText="Ready"
+          targetText="PSU1"
+          unit="V"
+          usageText="1 point"
+        />
+      </>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Export chart as PNG" }));
+    expect(screen.getByRole("dialog", { name: "Chart export" })).toHaveTextContent("Export not supported yet");
   });
 });

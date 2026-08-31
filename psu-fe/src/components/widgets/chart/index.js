@@ -20,6 +20,7 @@ export {
   ChartIcon,
 } from "./components/ChartCard.jsx";
 export { ScriptResultChart } from "./components/ScriptResultChart.jsx";
+export { ChartImageExportButton } from "./components/ChartImageExportButton.jsx";
 export {
   CHART_HISTORY_STORAGE_KEY,
   deleteChartHistory,

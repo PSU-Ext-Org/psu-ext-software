@@ -21,8 +21,26 @@ import { useScriptResultChartStatisticsConfig } from "../scriptResultChartStatis
 import { ChartView } from "./ChartView.jsx";
 import { ChartStatisticsSettings } from "./ChartStatisticsSettings.jsx";
 
-/** Renders one persisted Script Runner result series through the standard chart view. */
-export function ScriptResultChart({ onSettingsOpenChange = noop, seriesNames, settingsOpen = false, taskApiUrl, taskId }) {
+/**
+ * Renders selected Script Runner result series through the shared chart view.
+ *
+ * @param {object} props
+ * @param {string} props.exportId - Registry identity shared with the modal's export button.
+ * @param {(open: boolean) => void} [props.onSettingsOpenChange] - Controls statistics settings.
+ * @param {string[]} props.seriesNames - Result series selected for display.
+ * @param {boolean} [props.settingsOpen] - Whether statistics settings are visible.
+ * @param {string} props.taskApiUrl - Script Runner task API base URL.
+ * @param {string} props.taskId - Task whose result series are displayed.
+ * @returns {import("react").ReactElement}
+ */
+export function ScriptResultChart({
+  exportId,
+  onSettingsOpenChange = noop,
+  seriesNames,
+  settingsOpen = false,
+  taskApiUrl,
+  taskId,
+}) {
   const series = useMemo(() => seriesNames.map((seriesName, index) => ({
     ...DEFAULT_CHART_SERIES,
     id: `script-result-${seriesName}`,
@@ -46,9 +64,23 @@ export function ScriptResultChart({ onSettingsOpenChange = noop, seriesNames, se
     statistics,
   }), [data.unit, series, statistics]);
 
+  function closeSettings() {
+    onSettingsOpenChange(false);
+  }
+
+  function saveSettings(event) {
+    event.preventDefault();
+    setStatistics(draft);
+    closeSettings();
+  }
+
   return (
     <div className="relative h-full min-h-0">
       <ChartView
+        chartExport={{
+          fileStem: `result-chart-${taskId.slice(0, 5)}`,
+          id: exportId,
+        }}
         config={config}
         rendererKey={data.rendererKey}
         seriesData={data.seriesData}
@@ -57,12 +89,28 @@ export function ScriptResultChart({ onSettingsOpenChange = noop, seriesNames, se
         usageText={data.usageText}
       />
       {settingsOpen ? (
-        <Modal title="Result Chart Statistics" onClose={() => onSettingsOpenChange(false)} size="lg">
-          <form className="grid gap-4" onSubmit={(event) => { event.preventDefault(); setStatistics(draft); onSettingsOpenChange(false); }}>
-            <ChartStatisticsSettings idPrefix="script-result-chart-stat" statistics={draft} series={series} onChange={setDraft} />
+        <Modal onClose={closeSettings} size="lg" title="Result Chart Statistics">
+          <form className="grid gap-4" onSubmit={saveSettings}>
+            <ChartStatisticsSettings
+              idPrefix="script-result-chart-stat"
+              onChange={setDraft}
+              series={series}
+              statistics={draft}
+            />
             <div className="flex justify-end gap-2">
-              <button className="control-standard border border-slate-200 bg-white font-medium text-slate-700 hover:bg-slate-50" onClick={() => onSettingsOpenChange(false)} type="button">Cancel</button>
-              <button className="control-standard bg-teal-700 font-medium text-white hover:bg-teal-800" type="submit">Save</button>
+              <button
+                className="control-standard border border-slate-200 bg-white font-medium text-slate-700 hover:bg-slate-50"
+                onClick={closeSettings}
+                type="button"
+              >
+                Cancel
+              </button>
+              <button
+                className="control-standard bg-teal-700 font-medium text-white hover:bg-teal-800"
+                type="submit"
+              >
+                Save
+              </button>
             </div>
           </form>
         </Modal>
