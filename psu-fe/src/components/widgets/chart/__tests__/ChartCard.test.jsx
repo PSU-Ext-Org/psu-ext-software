@@ -89,6 +89,23 @@ describe("ChartCard", () => {
     expect(screen.queryByRole("button", { name: "Configure" })).not.toBeInTheDocument();
   });
 
+  it("keeps header export disabled until its chart has numeric samples", () => {
+    const placement = { id: "chart-home-main" };
+    const { rerender } = render(<ChartCardActions placement={placement} />);
+    expect(screen.getByRole("button", { name: "Export chart as PNG" })).toBeDisabled();
+
+    saveChartConfig("chart-home-main", [{
+      id: "voltage",
+      label: "Voltage",
+      deviceName: "PSU1",
+      query: "MEAS:VOLT? CH1",
+      lineColor: "#2563eb",
+    }]);
+    rerender(<><ChartCardActions placement={placement} /><ChartCard placement={placement} /></>);
+
+    expect(screen.getByRole("button", { name: "Export chart as PNG" })).toBeEnabled();
+  });
+
   it("saves chart settings under the placement id", () => {
     render(<ChartCardActions placement={{ id: "chart-home-main" }} />);
 

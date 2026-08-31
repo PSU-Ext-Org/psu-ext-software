@@ -27,6 +27,7 @@ import { deleteChartHistory, MAX_CHART_HISTORY_BYTES } from "../storage/chartHis
 import { validateChartDraft } from "../utils/chartStatus.js";
 import { useChartConfig } from "../hooks/useChartConfig.js";
 import { ChartStatisticsSettings } from "./ChartStatisticsSettings.jsx";
+import { ChartImageExportButton } from "./ChartImageExportButton.jsx";
 
 /**
  * Header action for configuring a persisted ChartCard instance.
@@ -38,6 +39,7 @@ export function ChartCardActions({ placement }) {
   return (
     <>
       <ClearChartHistoryButton placement={placement} />
+      <ChartImageExportButton exportId={placement.id} />
       <ChartSettingsButton iconOnly placement={placement} />
     </>
   );

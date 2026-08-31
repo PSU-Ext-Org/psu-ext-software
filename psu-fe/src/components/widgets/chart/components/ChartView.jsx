@@ -27,6 +27,7 @@ const EMPTY_POINTS = Object.freeze([]);
  * Source-independent chart presentation. Data sources only need to supply renderer-ready points.
  *
  * @param {object} props
+ * @param {{id: string, fileStem: string}} props.chartExport - Runtime export identity and filename source.
  * @param {object} props.config
  * @param {string} props.rendererKey
  * @param {Array<{id: string, label: string, color: string, points: Array<{t: number, y: number}>}>} props.seriesData
@@ -35,7 +36,15 @@ const EMPTY_POINTS = Object.freeze([]);
  * @param {string} props.usageText
  * @returns {import("react").ReactElement}
  */
-export function ChartView({ config, rendererKey, seriesData, statusText, targetText, usageText }) {
+export function ChartView({
+  chartExport,
+  config,
+  rendererKey,
+  seriesData,
+  statusText,
+  targetText,
+  usageText,
+}) {
   const [visibleTimeRange, setVisibleTimeRange] = useState(null);
   const firstSeries = config.series[0];
   const statisticsSeriesId = config.statistics.seriesId || firstSeries?.id;
@@ -61,6 +70,7 @@ export function ChartView({ config, rendererKey, seriesData, statusText, targetT
   return (
     <ChartRenderer
       key={rendererKey}
+      chartExport={chartExport}
       onVisibleTimeRangeChange={setVisibleTimeRange}
       seriesData={seriesData}
       statistics={statistics}

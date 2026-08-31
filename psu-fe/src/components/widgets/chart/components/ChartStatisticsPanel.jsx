@@ -13,11 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {
-  getEnabledChartStatistics,
-} from "../utils/chartStatistics.js";
+import { createChartStatisticsPresentation } from "../utils/chartStatisticsPresentation.js";
 
 /**
+ * Displays the same enabled, formatted statistics used by PNG chart exports.
+ *
  * @param {object} props
  * @param {string} [props.className]
  * @param {{enabledStats?: Record<string, boolean>, showStatistics?: boolean} | undefined} props.statisticsConfig
@@ -27,13 +27,8 @@ import {
  * @returns {import("react").ReactElement | null}
  */
 export function ChartStatisticsPanel({ className = "", statisticsConfig, statisticsSeries, stats, unit }) {
-  const enabledStatistics = getEnabledChartStatistics(statisticsConfig?.enabledStats);
-  const sampleCount = stats?.sampleCount ?? stats?.count ?? 0;
-  const values = stats?.values || stats || {};
-
-  if (!statisticsConfig?.showStatistics || !sampleCount || !enabledStatistics.length) {
-    return null;
-  }
+  const presentation = createChartStatisticsPresentation({ statisticsConfig, statisticsSeries, stats, unit });
+  if (!presentation) return null;
 
   return (
     <section
@@ -45,18 +40,18 @@ export function ChartStatisticsPanel({ className = "", statisticsConfig, statist
       data-testid="chart-statistics"
     >
       <div className="border-b border-slate-200 px-2 py-1 text-[0.625rem] font-semibold uppercase tracking-[0.08em] text-slate-500">
-        {statisticsSeries?.label ? `${statisticsSeries.label} stats` : "Statistics"}
+        {presentation.title}
       </div>
       <div
         className="grid auto-cols-[minmax(8rem,1fr)] grid-flow-col grid-rows-4 gap-x-3 gap-y-1 px-2 py-1.5"
-        style={{ gridTemplateRows: `repeat(${Math.min(enabledStatistics.length, 4)}, minmax(0, auto))` }}
+        style={{ gridTemplateRows: `repeat(${Math.min(presentation.rows.length, 4)}, minmax(0, auto))` }}
       >
-        {enabledStatistics.map((statistic) => {
+        {presentation.rows.map((row) => {
           return (
-            <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-2" key={statistic.id}>
-              <span className="truncate text-slate-600">{statistic.label}</span>
+            <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-2" key={row.id}>
+              <span className="truncate text-slate-600">{row.label}</span>
               <span className="text-right font-medium text-slate-800">
-                {statistic.formatValue(values[statistic.id], { unit })}
+                {row.value}
               </span>
             </div>
           );

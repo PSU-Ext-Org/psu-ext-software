@@ -18,7 +18,12 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { ScriptTaskConsole } from "../components/console/ScriptTaskConsole.jsx";
 
 vi.mock("../../chart/index.js", () => ({
-  ScriptResultChart: () => <div>Result chart</div>,
+  ChartImageExportButton: ({ exportId }) => (
+    <button aria-label="Export chart as PNG" data-export-id={exportId} disabled type="button" />
+  ),
+  ScriptResultChart: ({ exportId }) => (
+    <div data-export-id={exportId}>Result chart</div>
+  ),
 }));
 
 class FakeEventSource {
@@ -201,6 +206,7 @@ describe("ScriptTaskConsole", () => {
     expect(await screen.findByRole("dialog", { name: "Result chart" })).toHaveStyle({ maxWidth: "64rem" });
     expect(screen.getAllByText("Result chart")).toHaveLength(2);
     expect(screen.getAllByRole("link", { name: "CSV" })).toHaveLength(2);
+    expect(screen.getByRole("button", { name: "Export chart as PNG" })).toHaveAttribute("data-export-id", "script-result-chart:abcde-123");
   });
 
   it("retains only the latest 256 KiB of the log and downloads the full streamed log", async () => {

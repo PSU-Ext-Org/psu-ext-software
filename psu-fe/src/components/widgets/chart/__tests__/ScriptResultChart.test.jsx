@@ -29,7 +29,12 @@ vi.mock("../hooks/useScriptResultSeriesData.js", () => ({
 }));
 
 vi.mock("../components/ChartView.jsx", () => ({
-  ChartView: ({ config }) => <output aria-label="Rendered statistics">{JSON.stringify(config.statistics)}</output>,
+  ChartView: ({ chartExport, config }) => (
+    <>
+      <output aria-label="Rendered statistics">{JSON.stringify(config.statistics)}</output>
+      <output aria-label="Export contract">{`${chartExport.id}:${chartExport.fileStem}`}</output>
+    </>
+  ),
 }));
 
 describe("ScriptResultChart", () => {
@@ -63,5 +68,10 @@ describe("ScriptResultChart", () => {
     expect(window.localStorage.getItem(SCRIPT_RESULT_CHART_STATISTICS_STORAGE_KEY)).toBeNull();
     expect(screen.getByLabelText("Rendered statistics")).toHaveTextContent('"showStatistics":false');
     expect(onSettingsOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it("passes the task chart export identity and filename stem", () => {
+    render(<ScriptResultChart exportId="script-result-chart:task-12345" seriesNames={["voltage"]} taskApiUrl="http://runner.test/tasks" taskId="task-12345" />);
+    expect(screen.getByLabelText("Export contract")).toHaveTextContent("script-result-chart:task-12345:result-chart-task-");
   });
 });

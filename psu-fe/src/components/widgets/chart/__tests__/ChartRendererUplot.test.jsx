@@ -16,11 +16,17 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
-  ChartRenderer,
+  ChartRenderer as UplotChartRenderer,
   createUplotOptions,
   paddedValueRange,
   toUplotData,
 } from "../renderers/ChartRendererUplot.jsx";
+
+const DEFAULT_CHART_EXPORT = Object.freeze({ id: "chart-uplot-test", fileStem: "uPlot chart" });
+
+function ChartRenderer(props) {
+  return <UplotChartRenderer chartExport={DEFAULT_CHART_EXPORT} {...props} />;
+}
 
 const mockUplot = vi.hoisted(() => ({
   instances: [],
@@ -28,6 +34,9 @@ const mockUplot = vi.hoisted(() => ({
     this.options = options;
     this.data = data;
     this.root = root;
+    this.ctx = { canvas: document.createElement("canvas") };
+    this.series = options.series;
+    this.legend = { values: options.series.map(() => ({ _: "--" })) };
     this.setData = vi.fn((nextData) => {
       this.data = nextData;
     });
@@ -162,6 +171,25 @@ describe("ChartRendererUplot", () => {
     expect(mockUplot.instances[0].destroy).toHaveBeenCalled();
   });
 
+  it("registers image export only when samples are available", async () => {
+    const { ChartImageExportButton } = await import("../components/ChartImageExportButton.jsx");
+    render(
+      <>
+        <ChartImageExportButton exportId="chart-a" />
+        <ChartRenderer
+          chartExport={{ id: "chart-a", fileStem: "Voltage" }}
+          seriesData={SERIES_DATA}
+          statusText="Ready"
+          targetText="PSU1"
+          unit="V"
+          usageText="3 points"
+        />
+      </>,
+    );
+
+    expect(screen.getByRole("button", { name: "Export chart as PNG" })).toBeEnabled();
+  });
+
   it("configures cursor, legend, colors, and unit formatting", () => {
     const options = createUplotOptions({
       height: 150,
@@ -173,7 +201,7 @@ describe("ChartRendererUplot", () => {
       width: 640,
     });
 
-    expect(options.cursor).toMatchObject({ show: true, x: true, y: true });
+    expect(options.cursor).toMatchObject({ show: true, x: true, y: true, lock: true });
     expect(options.legend).toMatchObject({ show: true, live: true });
     expect(options.axes[0]).toMatchObject({ show: false, size: 0 });
     expect(options.axes[1]).toMatchObject({ size: 58, gap: 6 });

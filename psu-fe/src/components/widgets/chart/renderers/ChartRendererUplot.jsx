@@ -13,11 +13,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import uPlot from "uplot";
 import "uplot/dist/uPlot.min.css";
 import { ChartStatisticsPanel } from "../components/ChartStatisticsPanel.jsx";
+import { useRegisterChartImageExport } from "../export/chartExportRegistry.js";
+import {
+  composeChartPngCanvas,
+  createChartPngFileName,
+  createUplotCursorOverlay,
+  createUplotLegendRows,
+  downloadChartPng,
+} from "../export/chartImageExport.js";
 import { formatChartTime } from "../utils/chartTimeFormat.js";
+import { createChartStatisticsPresentation } from "../utils/chartStatisticsPresentation.js";
 
 const DEFAULT_CHART_WIDTH = 640;
 const DEFAULT_CHART_HEIGHT = 150;
@@ -27,6 +36,7 @@ const Y_AXIS_SIZE = 58;
  * uPlot implementation of the chart renderer contract.
  *
  * @param {object} props
+ * @param {{id: string, fileStem: string}} props.chartExport - Runtime export identity and filename source.
  * @param {ChartSeriesData[]} props.seriesData
  * @param {(visibleTimeRange: {minMs: number, maxMs: number} | null) => void} [props.onVisibleTimeRangeChange]
  * @param {{sampleCount?: number, values?: Record<string, number | null>}} props.statistics
@@ -39,6 +49,7 @@ const Y_AXIS_SIZE = 58;
  * @returns {import("react").ReactElement}
  */
 export function ChartRenderer({
+  chartExport,
   onVisibleTimeRangeChange,
   seriesData,
   statistics,
@@ -49,8 +60,11 @@ export function ChartRenderer({
   usageText,
   unit,
 }) {
+  const { fileStem, id: exportId } = chartExport;
   const rootRef = useRef(null);
+  const captureRootRef = useRef(null);
   const plotRef = useRef(null);
+  const exportSnapshotRef = useRef(null);
   const captureNextXScaleRef = useRef(false);
   const suppressScaleCaptureRef = useRef(false);
   const xZoomRangeRef = useRef(null);
@@ -61,6 +75,40 @@ export function ChartRenderer({
     () => seriesData.map((series) => [series.id, series.label, series.color].join("|")).join("||"),
     [seriesData],
   );
+  exportSnapshotRef.current = {
+    fileStem,
+    headerText,
+    seriesData,
+    statistics,
+    statisticsConfig,
+    statisticsSeries,
+    unit,
+    usageText,
+  };
+  const exportPng = useCallback(async () => {
+    const plot = plotRef.current;
+    const rootElement = captureRootRef.current;
+    const snapshot = exportSnapshotRef.current;
+    if (!plot?.ctx?.canvas || !rootElement || !snapshot) {
+      throw new Error("Chart is not ready to export.");
+    }
+
+    const canvas = composeChartPngCanvas({
+      cursorOverlay: createUplotCursorOverlay(plot, rootElement),
+      headerText: snapshot.headerText,
+      legendRows: createUplotLegendRows(plot, snapshot.seriesData),
+      plotCanvas: plot.ctx.canvas,
+      rootElement,
+      statistics: createChartStatisticsPresentation({
+        statisticsConfig: snapshot.statisticsConfig,
+        statisticsSeries: snapshot.statisticsSeries,
+        stats: snapshot.statistics,
+        unit: snapshot.unit,
+      }),
+      usageText: snapshot.usageText,
+    });
+    await downloadChartPng(canvas, createChartPngFileName(snapshot.fileStem));
+  }, []);
 
   useEffect(() => {
     if (!rootRef.current || !hasPoints) {
@@ -123,6 +171,12 @@ export function ChartRenderer({
     }
   }, [hasPoints, onVisibleTimeRangeChange]);
 
+  useRegisterChartImageExport(exportId, {
+    exportPng,
+    ready: hasPoints,
+    supported: true,
+  });
+
   if (!hasPoints) {
     return (
       <div className="flex min-h-full flex-col justify-between rounded-md bg-slate-100 px-3 py-2 text-sm text-slate-500">
@@ -138,7 +192,7 @@ export function ChartRenderer({
   }
 
   return (
-    <div className="relative h-full min-h-0 overflow-hidden rounded-md bg-slate-100" data-testid="chart-plot">
+    <div className="relative h-full min-h-0 overflow-hidden rounded-md bg-slate-100" data-testid="chart-plot" ref={captureRootRef}>
       <div
         className="pointer-events-none absolute right-3 top-2 z-10 flex min-w-0 items-center justify-end gap-3 text-xs"
         style={{ left: Y_AXIS_SIZE + 8 }}
@@ -247,6 +301,7 @@ export function createUplotOptions({
       show: true,
       x: true,
       y: true,
+      lock: true,
       bind: {
         dblclick: (_plot, target, handler) => {
           return (event) => {

@@ -86,6 +86,10 @@ export function ChartCard({ placement }) {
   return (
     <div className="h-full min-h-0 overflow-hidden">
       <ChartView
+        chartExport={{
+          fileStem: config.cardName,
+          id: placement.id,
+        }}
         config={config}
         rendererKey={rendererKey}
         seriesData={seriesData}

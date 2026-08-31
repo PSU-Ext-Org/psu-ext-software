@@ -21,6 +21,7 @@ import { ChartRenderer as SelectedChartRenderer } from "psu-chart-renderer";
  * Vite aliases `psu-chart-renderer` to the configured implementation.
  *
  * @param {object} props
+ * @param {{id: string, fileStem: string}} props.chartExport - Runtime export identity and filename source.
  * @param {ChartSeriesData[]} props.seriesData
  * @param {(visibleTimeRange: {minMs: number, maxMs: number} | null) => void} [props.onVisibleTimeRangeChange]
  * @param {{sampleCount?: number, values?: Record<string, number | null>}} props.statistics
