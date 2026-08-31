@@ -23,10 +23,9 @@ import {
   DEFAULT_TIMER_QUEUE_CONTROL_CONFIG,
   saveTimerQueueControlConfig,
   useTimerQueueControlConfig,
-  validateTimerQueueControlConfig,
 } from "../timerQueueConfig.js";
 
-export function TimerQueueSettingsButton({ iconOnly = false, placement }) {
+export function TimerQueueSettingsButton({ iconOnly = false, placement, timers }) {
   const { devices = [], deviceStatuses = {} } = useWebSocketConnection();
   const [config, setConfig] = useTimerQueueControlConfig(placement.id);
   const [open, setOpen] = useState(false);
@@ -40,7 +39,7 @@ export function TimerQueueSettingsButton({ iconOnly = false, placement }) {
     () => (devices.length ? devices : connectedTargets),
     [connectedTargets, devices],
   );
-  const validationError = validateTimerQueueControlConfig({ ...draft, timers: config.timers });
+  const validationError = String(draft.deviceName || "").trim() ? "" : "Select a target device.";
 
   useEffect(() => {
     if (!open) {
@@ -81,7 +80,10 @@ export function TimerQueueSettingsButton({ iconOnly = false, placement }) {
                 return;
               }
 
-              setConfig(saveTimerQueueControlConfig(placement.id, draft));
+              setConfig(saveTimerQueueControlConfig(placement.id, {
+                ...draft,
+                timers: timers ?? config.timers,
+              }));
               setOpen(false);
             }}
           >

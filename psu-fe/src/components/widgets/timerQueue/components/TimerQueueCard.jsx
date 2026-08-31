@@ -193,7 +193,7 @@ export function TimerQueueCard({ placement }) {
 
       {!config.deviceName ? (
         <div className="shrink-0">
-          <TimerQueueSettingsButton placement={placement} />
+          <TimerQueueSettingsButton placement={placement} timers={draftTimers} />
         </div>
       ) : null}
     </div>
