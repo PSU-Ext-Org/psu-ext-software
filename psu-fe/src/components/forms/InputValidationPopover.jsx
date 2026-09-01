@@ -76,7 +76,7 @@ export function InputValidationPopover({
         portal
           ? "pointer-events-none fixed z-[100] whitespace-nowrap rounded-md bg-rose-600 px-2 py-1 text-[10px] font-medium text-white shadow-sm"
           : "pointer-events-none absolute -top-7 z-10 whitespace-nowrap rounded-md bg-rose-600 px-2 py-1 text-[10px] font-medium text-white shadow-sm",
-        align === "left" ? "left-0" : "right-0",
+        portal ? "" : align === "left" ? "left-0" : "right-0",
         className,
       ].join(" ")}
       style={

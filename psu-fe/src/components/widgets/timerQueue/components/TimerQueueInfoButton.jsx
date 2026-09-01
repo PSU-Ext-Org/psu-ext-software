@@ -20,6 +20,11 @@ import { useModalDialog } from "../../../layout/hooks/useModalDialog.js";
 const TIMER_QUEUE_INFO_TEXT =
   "Use one timer widget per device/channel. Multiple widgets targeting the same queue are unsupported.";
 
+/**
+ * Opens the timer queue usage guidance dialog.
+ *
+ * @returns {import("react").ReactElement} Information trigger and dialog.
+ */
 export function TimerQueueInfoButton() {
   const [open, setOpen] = useState(false);
   const dialogRef = useModalDialog(open, () => setOpen(false));

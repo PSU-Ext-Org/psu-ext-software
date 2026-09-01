@@ -15,32 +15,74 @@
  */
 import { loadStoredWidgetConfig, saveStoredWidgetConfig, useStoredWidgetConfig } from "../widgetConfigStore.js";
 
+/** Fixed device channel supported by the timer queue widget. */
+export const TIMER_QUEUE_CHANNEL = "CH1";
+
+/** Shared timer queue limits used by editing and persistence. */
+export const TIMER_QUEUE_LIMITS = Object.freeze({
+  cardNameMaxLength: 48,
+  maxTimers: 10,
+  timerIdLength: 3,
+});
+
+/** User-facing validation messages for timer queue configuration. */
+export const TIMER_QUEUE_VALIDATION_MESSAGE = Object.freeze({
+  DEVICE_REQUIRED: "Select a target device.",
+  DURATION_INVALID: "Timer durations must be positive seconds with up to 3 decimals.",
+  ID_INVALID: "Timer ids must be exactly 3 characters.",
+  ID_NOT_UNIQUE: "Timer ids must be unique within the widget.",
+  TIMER_LIMIT_EXCEEDED: `Timer queue supports at most ${TIMER_QUEUE_LIMITS.maxTimers} steps.`,
+  TIMER_REQUIRED: "Add at least one timer.",
+});
+
 export const DEFAULT_TIMER_QUEUE_CONTROL_CONFIG = Object.freeze({
   type: "timerQueueControl",
   deviceName: "",
-  channel: "CH1",
+  channel: TIMER_QUEUE_CHANNEL,
   cardName: "Timer Queue",
   timers: [],
 });
 
-const TIMER_ID_LENGTH = 3;
-const MAX_TIMERS = 10;
-const CARD_NAME_MAX_LENGTH = 48;
 const DURATION_PATTERN = /^(?:0|[1-9]\d*)(?:\.\d{1,3})?$/;
 
+/**
+ * Loads and normalizes the persisted configuration for one timer queue widget.
+ *
+ * @param {string} widgetId - Dashboard widget identifier.
+ * @returns {object} Normalized timer queue configuration.
+ */
 export function loadTimerQueueControlConfig(widgetId) {
   return normalizeTimerQueueControlConfig(loadStoredWidgetConfig(widgetId));
 }
 
+/**
+ * Normalizes and persists the configuration for one timer queue widget.
+ *
+ * @param {string} widgetId - Dashboard widget identifier.
+ * @param {object} config - Candidate timer queue configuration.
+ * @returns {object} Persisted normalized configuration.
+ */
 export function saveTimerQueueControlConfig(widgetId, config) {
   const normalized = normalizeTimerQueueControlConfig({ ...config, type: "timerQueueControl" });
   return saveStoredWidgetConfig(widgetId, normalized);
 }
 
+/**
+ * Subscribes a component to normalized configuration changes for one widget.
+ *
+ * @param {string} widgetId - Dashboard widget identifier.
+ * @returns {[object, (config: object) => void]} Current configuration and local state setter.
+ */
 export function useTimerQueueControlConfig(widgetId) {
   return useStoredWidgetConfig(widgetId, loadTimerQueueControlConfig);
 }
 
+/**
+ * Converts untrusted persisted data into a complete timer queue configuration.
+ *
+ * @param {unknown} candidate - Untrusted stored value.
+ * @returns {object} Complete normalized configuration.
+ */
 export function normalizeTimerQueueControlConfig(candidate) {
   if (!candidate || typeof candidate !== "object" || candidate.type !== "timerQueueControl") {
     return cloneDefaultTimerQueueControlConfig();
@@ -49,29 +91,47 @@ export function normalizeTimerQueueControlConfig(candidate) {
   return {
     type: "timerQueueControl",
     deviceName: String(candidate.deviceName || "").trim(),
-    channel: "CH1",
-    cardName: String(candidate.cardName || DEFAULT_TIMER_QUEUE_CONTROL_CONFIG.cardName).trim().slice(0, CARD_NAME_MAX_LENGTH)
+    channel: TIMER_QUEUE_CHANNEL,
+    cardName: String(candidate.cardName || DEFAULT_TIMER_QUEUE_CONTROL_CONFIG.cardName).trim().slice(0, TIMER_QUEUE_LIMITS.cardNameMaxLength)
       || DEFAULT_TIMER_QUEUE_CONTROL_CONFIG.cardName,
     timers: normalizeTimerRows(candidate.timers),
   };
 }
 
+/**
+ * Normalizes persisted timer rows while enforcing the configured timer limit.
+ *
+ * @param {unknown} candidate - Candidate timer-row collection.
+ * @returns {Array<object>} Normalized timer rows.
+ */
 export function normalizeTimerRows(candidate) {
   if (!Array.isArray(candidate)) {
     return [];
   }
 
-  return candidate.slice(0, MAX_TIMERS).map((row) => ({
-    id: String(row?.id || "").trim().slice(0, TIMER_ID_LENGTH),
+  return candidate.slice(0, TIMER_QUEUE_LIMITS.maxTimers).map((row) => ({
+    id: String(row?.id || "").trim().slice(0, TIMER_QUEUE_LIMITS.timerIdLength),
     durationSeconds: normalizeDurationSeconds(row?.durationSeconds),
     relayOnAfterExpiry: Boolean(row?.relayOnAfterExpiry),
   }));
 }
 
+/**
+ * Converts an editable duration field to its normalized string representation.
+ *
+ * @param {unknown} value - Editable field value.
+ * @returns {string} Trimmed duration text.
+ */
 export function normalizeDurationSeconds(value) {
   return String(value || "").trim().slice(0, 16);
 }
 
+/**
+ * Parses a positive duration string with millisecond precision.
+ *
+ * @param {unknown} value - Duration in seconds.
+ * @returns {number | null} Milliseconds, or null when invalid.
+ */
 export function parseDurationSecondsToMs(value) {
   const normalized = normalizeDurationSeconds(value);
   if (!DURATION_PATTERN.test(normalized)) {
@@ -87,54 +147,65 @@ export function parseDurationSecondsToMs(value) {
   return milliseconds > 0 ? milliseconds : null;
 }
 
-export function validateTimerRow(row) {
+/**
+ * Returns the first field-level validation issue for a timer row, if any.
+ *
+ * @param {object} row - Candidate timer row.
+ * @returns {{field: string, message: string} | null} Field issue.
+ */
+export function getTimerRowValidationIssue(row) {
   const id = String(row?.id || "").trim();
-  if (id.length !== TIMER_ID_LENGTH) {
-    return "Timer ids must be exactly 3 characters.";
+  if (id.length !== TIMER_QUEUE_LIMITS.timerIdLength) {
+    return { field: "id", message: TIMER_QUEUE_VALIDATION_MESSAGE.ID_INVALID };
   }
 
   if (parseDurationSecondsToMs(row?.durationSeconds) == null) {
-    return "Timer durations must be positive seconds with up to 3 decimals.";
+    return { field: "durationSeconds", message: TIMER_QUEUE_VALIDATION_MESSAGE.DURATION_INVALID };
   }
 
-  return "";
+  return null;
 }
 
+/**
+ * Returns a row validation message for callers that only need text.
+ *
+ * @param {object} row - Candidate timer row.
+ * @returns {string} Validation message, or an empty string.
+ */
+export function validateTimerRow(row) {
+  return getTimerRowValidationIssue(row)?.message || "";
+}
+
+/**
+ * Returns the first widget-level or row-level configuration validation issue.
+ *
+ * @param {object} config - Candidate timer queue configuration.
+ * @returns {{message: string, rowIndex?: number, field?: string} | null} Validation issue.
+ */
 export function getTimerQueueValidationIssue(config) {
   if (!String(config?.deviceName || "").trim()) {
-    return { message: "Select a target device." };
+    return { message: TIMER_QUEUE_VALIDATION_MESSAGE.DEVICE_REQUIRED };
   }
 
   if (!Array.isArray(config?.timers) || config.timers.length < 1) {
-    return { message: "Add at least one timer." };
+    return { message: TIMER_QUEUE_VALIDATION_MESSAGE.TIMER_REQUIRED };
   }
 
-  if (config.timers.length > MAX_TIMERS) {
-    return { message: `Timer queue supports at most ${MAX_TIMERS} steps.` };
+  if (config.timers.length > TIMER_QUEUE_LIMITS.maxTimers) {
+    return { message: TIMER_QUEUE_VALIDATION_MESSAGE.TIMER_LIMIT_EXCEEDED };
   }
 
   const seenIds = new Set();
   for (const [index, row] of config.timers.entries()) {
+    const rowValidation = getTimerRowValidationIssue(row);
+    if (rowValidation) {
+      return { ...rowValidation, rowIndex: index };
+    }
+
     const id = String(row?.id || "").trim();
-    if (id.length !== TIMER_ID_LENGTH) {
-      return {
-        message: "Timer ids must be exactly 3 characters.",
-        rowIndex: index,
-        field: "id",
-      };
-    }
-
-    if (parseDurationSecondsToMs(row?.durationSeconds) == null) {
-      return {
-        message: "Timer durations must be positive seconds with up to 3 decimals.",
-        rowIndex: index,
-        field: "durationSeconds",
-      };
-    }
-
     if (seenIds.has(id)) {
       return {
-        message: "Timer ids must be unique within the widget.",
+        message: TIMER_QUEUE_VALIDATION_MESSAGE.ID_NOT_UNIQUE,
         rowIndex: index,
         field: "id",
       };
@@ -146,10 +217,21 @@ export function getTimerQueueValidationIssue(config) {
   return null;
 }
 
+/**
+ * Returns the first configuration validation message, or an empty string when valid.
+ *
+ * @param {object} config - Candidate timer queue configuration.
+ * @returns {string} Validation message, or an empty string.
+ */
 export function validateTimerQueueControlConfig(config) {
   return getTimerQueueValidationIssue(config)?.message || "";
 }
 
+/**
+ * Creates a mutable default configuration suitable for component state.
+ *
+ * @returns {object} Fresh default configuration.
+ */
 export function cloneDefaultTimerQueueControlConfig() {
   return {
     ...DEFAULT_TIMER_QUEUE_CONTROL_CONFIG,
@@ -157,6 +239,11 @@ export function cloneDefaultTimerQueueControlConfig() {
   };
 }
 
+/**
+ * Creates an empty editable timer row.
+ *
+ * @returns {{id: string, durationSeconds: string, relayOnAfterExpiry: boolean}} Empty row.
+ */
 export function createEmptyTimerRow() {
   return {
     id: "",
@@ -165,9 +252,11 @@ export function createEmptyTimerRow() {
   };
 }
 
+/**
+ * Returns shared limits for legacy callers. Prefer `TIMER_QUEUE_LIMITS` in new code.
+ *
+ * @returns {{cardNameMaxLength: number, maxTimers: number, timerIdLength: number}} Immutable limits.
+ */
 export function getTimerQueueConfigLimits() {
-  return {
-    maxTimers: MAX_TIMERS,
-    timerIdLength: TIMER_ID_LENGTH,
-  };
+  return TIMER_QUEUE_LIMITS;
 }

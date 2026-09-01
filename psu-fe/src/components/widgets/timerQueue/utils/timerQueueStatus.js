@@ -13,26 +13,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { MONITOR_TAG } from "../../../../connection/ws-proxy/monitor/monitorTagQueue.js";
-import { parseDurationSecondsToMs, validateTimerQueueControlConfig } from "../timerQueueConfig.js";
+import { parseDurationSecondsToMs } from "../timerQueueConfig.js";
 
-export const INITIAL_TIMER_QUEUE_RUNTIME = Object.freeze({
-  activeId: "NONE",
-  state: "IDLE",
-  remainingMs: 0,
-  syncedAtMs: 0,
-  queueLoaded: false,
-  desynced: false,
-  loading: false,
-  message: "Queue not loaded",
-  error: "",
-});
-
+/** Timer state reported while the device is actively counting down. */
 export const RUNNING_TIMER_STATE = "RUNNING";
+
+/** Device states that can continue an already loaded queue. */
 export const RESUMABLE_TIMER_STATES = new Set(["PAUSED", "OVP", "OCP", "OVR"]);
 
 const EMPTY_STATUS_RESPONSE = "NONE,IDLE,0.000";
 
+/**
+ * Builds runtime state from a raw `TIM:STATUS?` response and the local preset.
+ *
+ * @param {string} response - Device status response.
+ * @param {Array<{id: string, durationSeconds: string}>} configuredTimers - Local timer preset.
+ * @returns {object} Runtime state suitable for display.
+ */
 export function createRuntimeFromStatusResponse(response, configuredTimers) {
   const parsed = parseTimerStatusResponse(response);
   const activeTimer = configuredTimers.find((timer) => timer.id === parsed.activeId) || null;
@@ -41,37 +38,39 @@ export function createRuntimeFromStatusResponse(response, configuredTimers) {
 
   return {
     activeId: parsed.activeId,
-    state: parsed.state,
-    remainingMs: parsed.remainingMs,
-    syncedAtMs: parsed.state === RUNNING_TIMER_STATE ? Date.now() : 0,
-    queueLoaded,
     desynced,
-    message: desynced
-      ? "Out of sync"
-      : queueLoaded
-        ? parsed.state === "IDLE"
-          ? "Queued and idle"
-          : parsed.state === RUNNING_TIMER_STATE
-            ? "Running"
-            : parsed.state
-        : configuredTimers.length
-          ? "Preset not loaded"
-          : "Queue not loaded",
     error: "",
+    message: getRuntimeStatusMessage({ desynced, parsed, queueLoaded, timerCount: configuredTimers.length }),
+    queueLoaded,
+    remainingMs: parsed.remainingMs,
+    state: parsed.state,
+    syncedAtMs: parsed.state === RUNNING_TIMER_STATE ? Date.now() : 0,
   };
 }
 
+/**
+ * Parses a timer status response, defaulting malformed empty values to idle.
+ *
+ * @param {unknown} response - Raw status response from the device.
+ * @returns {{activeId: string, remainingMs: number, state: string}} Parsed status values.
+ */
 export function parseTimerStatusResponse(response) {
   const normalized = String(response || "").trim() || EMPTY_STATUS_RESPONSE;
   const [activeId = "NONE", state = "IDLE", remainingText = "0.000"] = normalized.split(",");
 
   return {
     activeId: String(activeId || "NONE").trim() || "NONE",
-    state: String(state || "IDLE").trim() || "IDLE",
     remainingMs: parseTimerRemainingToMs(remainingText),
+    state: String(state || "IDLE").trim() || "IDLE",
   };
 }
 
+/**
+ * Converts the remaining-seconds field from a status response into milliseconds.
+ *
+ * @param {unknown} value - Device-reported seconds.
+ * @returns {number} Non-negative milliseconds.
+ */
 export function parseTimerRemainingToMs(value) {
   const normalized = String(value || "").trim();
   if (!normalized) {
@@ -86,6 +85,12 @@ export function parseTimerRemainingToMs(value) {
   return Math.round(seconds * 1000);
 }
 
+/**
+ * Returns the primary runtime action label for the current device state.
+ *
+ * @param {{queueLoaded: boolean, state: string}} runtime - Current runtime state.
+ * @returns {string} Action label.
+ */
 export function getTimerActionLabel(runtime) {
   if (runtime.state === RUNNING_TIMER_STATE) {
     return "Pause";
@@ -98,6 +103,12 @@ export function getTimerActionLabel(runtime) {
   return "Load and start";
 }
 
+/**
+ * Returns the concise runtime message shown below the editor.
+ *
+ * @param {{config: object, device: object | undefined, deviceConnected: boolean, runtime: object, validationError: string, wsConnected: boolean}} context - Current widget and connection state.
+ * @returns {string} User-facing helper text.
+ */
 export function getTimerQueueHelperText({ config, device, deviceConnected, runtime, validationError, wsConnected }) {
   if (!wsConnected) {
     return "WebSocket offline";
@@ -126,6 +137,12 @@ export function getTimerQueueHelperText({ config, device, deviceConnected, runti
   return runtime.message;
 }
 
+/**
+ * Formats milliseconds as a fixed minutes, seconds, and milliseconds display.
+ *
+ * @param {number} remainingMs - Remaining duration in milliseconds.
+ * @returns {string} Formatted duration.
+ */
 export function formatRemaining(remainingMs) {
   const safeRemainingMs = Math.max(0, Number(remainingMs) || 0);
   const totalSeconds = Math.floor(safeRemainingMs / 1000);
@@ -136,13 +153,12 @@ export function formatRemaining(remainingMs) {
   return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}.${String(millis).padStart(3, "0")}`;
 }
 
-export function sendTimerQueueCommand(sendScpiCommand, deviceName, command) {
-  return sendScpiCommand(command, deviceName, {
-    tag: MONITOR_TAG.GUI,
-    waitForResponse: true,
-  });
-}
-
+/**
+ * Returns an explanatory message when no device command can be sent.
+ *
+ * @param {{device: object | undefined, wsConnected: boolean}} context - Connection state.
+ * @returns {string} Runtime message.
+ */
 export function buildNonRunnableRuntimeMessage({ wsConnected, device }) {
   if (!wsConnected) {
     return "WebSocket offline";
@@ -155,80 +171,12 @@ export function buildNonRunnableRuntimeMessage({ wsConnected, device }) {
   return "Device disconnected";
 }
 
-export async function runTimerQueueAction({
-  config,
-  displayedRemainingMs,
-  runtime,
-  sendScpiCommand,
-}) {
-  const currentConfigError = validateTimerQueueControlConfig(config);
-  if (currentConfigError) {
-    return {
-      kind: "error",
-      error: currentConfigError,
-      message: currentConfigError,
-    };
-  }
-
-  if (runtime.state === RUNNING_TIMER_STATE) {
-    await sendTimerQueueCommand(sendScpiCommand, config.deviceName, "TIM:PAUSE CH1");
-    return {
-      kind: "runtime",
-      runtime: {
-        ...runtime,
-        state: "PAUSED",
-        remainingMs: displayedRemainingMs,
-        syncedAtMs: 0,
-        loading: false,
-        message: "Paused",
-        error: "",
-      },
-    };
-  }
-
-  if (RESUMABLE_TIMER_STATES.has(runtime.state) && runtime.queueLoaded) {
-    await sendTimerQueueCommand(sendScpiCommand, config.deviceName, "TIM:START CH1");
-    return {
-      kind: "runtime",
-      runtime: {
-        ...runtime,
-        state: RUNNING_TIMER_STATE,
-        remainingMs: displayedRemainingMs,
-        syncedAtMs: Date.now(),
-        loading: false,
-        message: "Running",
-        error: "",
-      },
-    };
-  }
-
-  await sendTimerQueueCommand(sendScpiCommand, config.deviceName, "TIM:CLE CH1");
-  for (const timer of config.timers) {
-    await sendTimerQueueCommand(
-      sendScpiCommand,
-      config.deviceName,
-      `TIM:ADD CH1,${timer.id},${timer.durationSeconds},${timer.relayOnAfterExpiry ? "1" : "0"}`,
-    );
-  }
-  await sendTimerQueueCommand(sendScpiCommand, config.deviceName, "TIM:START CH1");
-
-  const firstTimer = config.timers[0];
-  return {
-    kind: "runtime",
-    runtime: {
-      activeId: firstTimer.id,
-      state: RUNNING_TIMER_STATE,
-      remainingMs: parseDurationSecondsToMs(firstTimer.durationSeconds) || 0,
-      syncedAtMs: Date.now(),
-      queueLoaded: true,
-      desynced: false,
-      loading: false,
-      message: "Running",
-      error: "",
-    },
-  };
-}
-
+/**
+ * Advances the local progress display after a running timer reaches zero.
+ *
+ * @param {{configTimers: Array<object>, runtime: object}} context - Preset and runtime state.
+ * @returns {object | null} Next runtime state, or null when no local transition applies.
+ */
 export function updateRuntimeAfterCompletion({ configTimers, runtime }) {
   const activeIndex = configTimers.findIndex((timer) => timer.id === runtime.activeId);
   if (activeIndex < 0) {
@@ -240,25 +188,41 @@ export function updateRuntimeAfterCompletion({ configTimers, runtime }) {
     return {
       ...runtime,
       activeId: nextTimer.id,
-      state: RUNNING_TIMER_STATE,
-      remainingMs: parseDurationSecondsToMs(nextTimer.durationSeconds) || 0,
-      syncedAtMs: Date.now(),
-      queueLoaded: true,
       desynced: false,
-      message: "Running",
       error: "",
+      message: "Running",
+      queueLoaded: true,
+      remainingMs: parseDurationSecondsToMs(nextTimer.durationSeconds) || 0,
+      state: RUNNING_TIMER_STATE,
+      syncedAtMs: Date.now(),
     };
   }
 
   return {
     ...runtime,
     activeId: "NONE",
-    state: "IDLE",
-    remainingMs: 0,
-    syncedAtMs: 0,
-    queueLoaded: false,
     desynced: false,
-    message: "Queue complete",
     error: "",
+    message: "Queue complete",
+    queueLoaded: false,
+    remainingMs: 0,
+    state: "IDLE",
+    syncedAtMs: 0,
   };
+}
+
+function getRuntimeStatusMessage({ desynced, parsed, queueLoaded, timerCount }) {
+  if (desynced) {
+    return "Out of sync";
+  }
+
+  if (!queueLoaded) {
+    return timerCount ? "Preset not loaded" : "Queue not loaded";
+  }
+
+  if (parsed.state === "IDLE") {
+    return "Queued and idle";
+  }
+
+  return parsed.state === RUNNING_TIMER_STATE ? "Running" : parsed.state;
 }

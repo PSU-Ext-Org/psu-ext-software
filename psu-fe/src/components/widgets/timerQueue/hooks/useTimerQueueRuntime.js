@@ -13,21 +13,37 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { parseDurationSecondsToMs } from "../timerQueueConfig.js";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
+import { parseDurationSecondsToMs, TIMER_QUEUE_CHANNEL } from "../timerQueueConfig.js";
+import { runTimerQueueAction, sendTimerQueueCommand } from "../utils/timerQueueCommands.js";
 import {
   buildNonRunnableRuntimeMessage,
   createRuntimeFromStatusResponse,
-  INITIAL_TIMER_QUEUE_RUNTIME,
-  runTimerQueueAction,
   RUNNING_TIMER_STATE,
-  sendTimerQueueCommand,
   updateRuntimeAfterCompletion,
-} from "../utils/timerQueueRuntime.js";
+} from "../utils/timerQueueStatus.js";
+import {
+  INITIAL_TIMER_QUEUE_RUNTIME,
+  TIMER_QUEUE_RUNTIME_ACTION,
+  timerQueueRuntimeReducer,
+} from "../utils/timerQueueRuntimeState.js";
 
+/**
+ * Synchronizes timer queue runtime state with the selected device.
+ *
+ * Stale responses are ignored when a newer request starts or the configured
+ * device and preset change while a request is in flight.
+ *
+ * @param {{config: object, device: object | undefined, runnable: boolean, sendScpiCommand: Function, wsConnected: boolean}} options - Timer configuration and connection adapter.
+ * @returns {{runtime: object, displayedRemainingMs: number, progressPercent: number | null, refreshStatus: () => Promise<void>, handleTimerAction: () => Promise<void>}} Runtime view model and actions.
+ */
 export function useTimerQueueRuntime({ config, device, runnable, sendScpiCommand, wsConnected }) {
-  const [runtime, setRuntime] = useState(INITIAL_TIMER_QUEUE_RUNTIME);
+  const [runtime, dispatchRuntime] = useReducer(timerQueueRuntimeReducer, INITIAL_TIMER_QUEUE_RUNTIME);
   const [clockNowMs, setClockNowMs] = useState(() => Date.now());
+  const targetKey = getRuntimeTargetKey(config);
+  const latestTargetKeyRef = useRef(targetKey);
+  const requestIdRef = useRef(0);
+  latestTargetKeyRef.current = targetKey;
 
   const activeTimer = useMemo(
     () => config.timers.find((timer) => timer.id === runtime.activeId) || null,
@@ -59,42 +75,50 @@ export function useTimerQueueRuntime({ config, device, runnable, sendScpiCommand
   }, [runtime.state]);
 
   const refreshStatus = useCallback(async () => {
+    const requestId = ++requestIdRef.current;
     if (!runnable) {
-      setRuntime((current) => ({
-        ...current,
-        loading: false,
+      dispatchRuntime({
         message: buildNonRunnableRuntimeMessage({ wsConnected, device }),
-      }));
+        type: TIMER_QUEUE_RUNTIME_ACTION.NON_RUNNABLE,
+      });
       return;
     }
 
-    setRuntime((current) => ({
-      ...current,
-      loading: true,
-      error: "",
+    dispatchRuntime({
       message: "Refreshing status",
-    }));
+      type: TIMER_QUEUE_RUNTIME_ACTION.REQUEST_STARTED,
+    });
 
     try {
-      const result = await sendTimerQueueCommand(sendScpiCommand, config.deviceName, "TIM:STATUS? CH1");
-      setRuntime({
-        ...createRuntimeFromStatusResponse(result.response, config.timers),
-        loading: false,
-        error: "",
+      const result = await sendTimerQueueCommand(
+        sendScpiCommand,
+        config.deviceName,
+        `TIM:STATUS? ${TIMER_QUEUE_CHANNEL}`,
+      );
+      if (!isCurrentRequest(requestId, targetKey)) {
+        return;
+      }
+
+      dispatchRuntime({
+        runtime: createRuntimeFromStatusResponse(result.response, config.timers),
+        type: TIMER_QUEUE_RUNTIME_ACTION.STATUS_RECEIVED,
       });
     } catch (error) {
-      setRuntime((current) => ({
-        ...current,
-        loading: false,
-        error: error instanceof Error ? error.message : "Status refresh failed.",
-        message: error instanceof Error ? error.message : "Status refresh failed.",
-      }));
+      if (!isCurrentRequest(requestId, targetKey)) {
+        return;
+      }
+
+      dispatchRuntime({
+        error: getErrorMessage(error, "Status refresh failed."),
+        type: TIMER_QUEUE_RUNTIME_ACTION.REQUEST_FAILED,
+      });
     }
-  }, [config.deviceName, config.timers, device, runnable, sendScpiCommand, wsConnected]);
+  }, [config.deviceName, config.timers, device, runnable, sendScpiCommand, targetKey, wsConnected]);
 
   useEffect(() => {
     if (!runnable) {
-      setRuntime(INITIAL_TIMER_QUEUE_RUNTIME);
+      requestIdRef.current += 1;
+      dispatchRuntime({ type: TIMER_QUEUE_RUNTIME_ACTION.RESET });
       return;
     }
 
@@ -108,7 +132,10 @@ export function useTimerQueueRuntime({ config, device, runnable, sendScpiCommand
 
     const nextRuntime = updateRuntimeAfterCompletion({ configTimers: config.timers, runtime });
     if (nextRuntime) {
-      setRuntime(nextRuntime);
+      dispatchRuntime({
+        runtime: nextRuntime,
+        type: TIMER_QUEUE_RUNTIME_ACTION.TIMER_COMPLETED,
+      });
     }
   }, [config.timers, displayedRemainingMs, runtime]);
 
@@ -117,12 +144,10 @@ export function useTimerQueueRuntime({ config, device, runnable, sendScpiCommand
       return;
     }
 
-    setRuntime((current) => ({
-      ...current,
-      loading: true,
-      error: "",
+    dispatchRuntime({
       message: runtime.state === RUNNING_TIMER_STATE ? "Pausing timer" : "Applying timer queue",
-    }));
+      type: TIMER_QUEUE_RUNTIME_ACTION.REQUEST_STARTED,
+    });
 
     try {
       const result = await runTimerQueueAction({
@@ -132,23 +157,22 @@ export function useTimerQueueRuntime({ config, device, runnable, sendScpiCommand
         sendScpiCommand,
       });
       if (result.kind === "error") {
-        setRuntime((current) => ({
-          ...current,
-          loading: false,
+        dispatchRuntime({
           error: result.error,
-          message: result.message,
-        }));
+          type: TIMER_QUEUE_RUNTIME_ACTION.REQUEST_FAILED,
+        });
         return;
       }
 
-      setRuntime(result.runtime);
+      dispatchRuntime({
+        runtime: result.runtime,
+        type: TIMER_QUEUE_RUNTIME_ACTION.ACTION_COMPLETED,
+      });
     } catch (error) {
-      setRuntime((current) => ({
-        ...current,
-        loading: false,
-        error: error instanceof Error ? error.message : "Timer action failed.",
-        message: error instanceof Error ? error.message : "Timer action failed.",
-      }));
+      dispatchRuntime({
+        error: getErrorMessage(error, "Timer action failed."),
+        type: TIMER_QUEUE_RUNTIME_ACTION.REQUEST_FAILED,
+      });
     }
   }, [config, displayedRemainingMs, runnable, runtime, sendScpiCommand]);
 
@@ -159,4 +183,16 @@ export function useTimerQueueRuntime({ config, device, runnable, sendScpiCommand
     refreshStatus,
     handleTimerAction,
   };
+
+  function isCurrentRequest(requestId, requestTargetKey) {
+    return requestId === requestIdRef.current && requestTargetKey === latestTargetKeyRef.current;
+  }
+}
+
+function getRuntimeTargetKey(config) {
+  return `${config.deviceName}\u0000${JSON.stringify(config.timers)}`;
+}
+
+function getErrorMessage(error, fallbackMessage) {
+  return error instanceof Error ? error.message : fallbackMessage;
 }
