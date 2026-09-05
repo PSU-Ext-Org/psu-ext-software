@@ -250,6 +250,9 @@ UUID and falls back to `SYSTEM` for unsolicited lifecycle messages.
 The monitor parses tags from the stored text and offers compact available and
 selected tag filters above the log. Selecting one or more tags only changes the
 displayed log; removing all selected tags restores the full stored text.
+Sending a command automatically selects only the `USER` filter, showing user
+commands and their responses. This filter stays selected until removed, even
+when the log is cleared.
 
 ## Components
 

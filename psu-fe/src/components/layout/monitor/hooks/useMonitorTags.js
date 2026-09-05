@@ -48,7 +48,7 @@ export function useMonitorTags(wsMessages, getWsTags) {
 
   useEffect(() => {
     setSelectedTags((current) => {
-      const next = current.filter((tag) => availableTags.includes(tag));
+      const next = current.filter((tag) => tag === MONITOR_TAG.USER || availableTags.includes(tag));
       return next.length === current.length ? current : next;
     });
   }, [availableTags, availableTagsKey]);
@@ -66,13 +66,7 @@ export function useMonitorTags(wsMessages, getWsTags) {
   }
 
   function includeUserTag() {
-    setSelectedTags((current) => {
-      if (!current.length || current.includes(MONITOR_TAG.USER)) {
-        return current;
-      }
-
-      return [...current, MONITOR_TAG.USER];
-    });
+    setSelectedTags([MONITOR_TAG.USER]);
   }
 
   return {

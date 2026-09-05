@@ -31,7 +31,7 @@ export function MonitorTagFilters({ filters }) {
     filters.remove(event.currentTarget.value);
   }
 
-  if (!hasAvailableTags) {
+  if (!hasAvailableTags && !filters.selected.length) {
     return (
       <div className="min-w-0 rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] leading-5 text-slate-600">
         <div className="flex items-center text-slate-400">
