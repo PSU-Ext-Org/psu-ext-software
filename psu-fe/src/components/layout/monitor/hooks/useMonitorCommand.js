@@ -23,7 +23,7 @@ import { MONITOR_TAG } from "../../../../connection/ws-proxy/monitor/monitorTagQ
  * @param {object} options
  * @param {object[]} options.devices - Known device definitions.
  * @param {object} options.deviceStatuses - Current device connection statuses.
- * @param {() => void} options.onCommandSent - Includes the USER tag in active filters after sending.
+ * @param {() => void} options.onCommandSent - Selects only the USER tag after sending.
  * @param {(command: string, targetName: string, options: object) => boolean} options.sendScpiCommand - Sends the command.
  * @param {boolean} options.wsConnected - Whether the WebSocket transport is connected.
  * @returns {object} Command form view model consumed by MonitorCommandForm.

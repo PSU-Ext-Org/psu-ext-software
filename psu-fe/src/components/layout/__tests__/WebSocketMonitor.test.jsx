@@ -297,7 +297,7 @@ describe("WebSocketMonitor", () => {
     });
   });
 
-  it("adds the USER tag to active filters after sending a command", () => {
+  it.each([false, true])("selects only USER after sending and restores all messages when removed (existing filter: %s)", (hasFilter) => {
     mockConnection.wsConnected = true;
     mockConnection.wsMessages = MONITOR_TEXT;
     mockConnection.getWsMessages.mockImplementation(() => mockConnection.wsMessages);
@@ -307,14 +307,42 @@ describe("WebSocketMonitor", () => {
 
     render(<WebSocketMonitor />);
 
-    fireEvent.click(screen.getByRole("button", { name: "SYSTEM" }));
-    expect(screen.getByRole("button", { name: "Remove SYSTEM filter" })).toBeInTheDocument();
+    if (hasFilter) fireEvent.click(screen.getByRole("button", { name: "SYSTEM" }));
     expect(screen.queryByRole("button", { name: "Remove USER filter" })).not.toBeInTheDocument();
 
     fireEvent.change(screen.getByRole("textbox"), { target: { value: "MEAS:VOLT?" } });
     fireEvent.click(screen.getByRole("button", { name: "Send" }));
 
-    expect(screen.getByRole("button", { name: "Remove SYSTEM filter" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Remove SYSTEM filter" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Remove USER filter" })).toBeInTheDocument();
+    expect(screen.getByText(/MEAS:VOLT\?/)).toBeInTheDocument();
+    expect(screen.getByText(/12\.34/)).toBeInTheDocument();
+    expect(screen.queryByText(/\/status/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/OUTP\?/)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove USER filter" }));
+    expect(screen.getByText(/\/status/)).toBeInTheDocument();
+    expect(screen.getByText(/OUTP\?/)).toBeInTheDocument();
+  });
+
+  it("keeps the automatic USER filter while the log is empty or contains only background messages", () => {
+    mockConnection.wsConnected = true;
+    mockConnection.devices = [{ id: "0", name: "PSU1" }];
+    mockConnection.deviceStatuses = { 0: { state: "CONNECTED" } };
+    mockConnection.sendScpiCommand.mockReturnValue(true);
+    const { rerender } = render(<WebSocketMonitor />);
+
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "MEAS:VOLT?" } });
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    expect(screen.getByRole("button", { name: "Remove USER filter" })).toBeInTheDocument();
+
+    mockConnection.wsMessages = MONITOR_TEXT.split("\n")[0];
+    rerender(<WebSocketMonitor />);
+    expect(screen.getByRole("button", { name: "Remove USER filter" })).toBeInTheDocument();
+    expect(screen.queryByText(/\/status/)).not.toBeInTheDocument();
+
+    mockConnection.wsMessages = "";
+    rerender(<WebSocketMonitor />);
     expect(screen.getByRole("button", { name: "Remove USER filter" })).toBeInTheDocument();
   });
 
