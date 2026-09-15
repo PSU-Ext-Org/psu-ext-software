@@ -17,24 +17,20 @@
   const measurementSettlingMilliseconds = 2000;
   const operatorInputTimeoutMilliseconds = 5 * 60 * 1000;
 
-  // These eight points must match the PSU-EXT current-calibration protocol.
+  // Choose as many ascending points as the calibration procedure requires.
+  // A replacement calibration commits only the points captured in this run.
   const calibrationTargetCurrentsAmps = [
-    0, 0.0030, 0.0050, 0.0100, 0.0500, 0.1000, 0.250, 0.500
+    0, 0.0010, 0.0030, 0.0050, 0.0100, 0.0500, 0.1000, 0.250, 0.500
   ];
 
   if (psuExtChannel !== "CH1") {
     throw new Error("PSU-EXT current calibration supports only CH1");
   }
 
-  if (calibrationTargetCurrentsAmps.length !== 8) {
-    throw new Error("PSU-EXT current calibration requires exactly eight points");
-  }
-
   const sourceOutput = "OUTP " + siglentChannel + ",";
   const psuExtOutput = "OUTP " + psuExtChannel + ",";
   let calibrationTransactionOpen = false;
   let previousActualCurrentAmps = -1;
-  let previousCapturedRawValue = -1;
   let completedPoints = 0;
 
   try {
@@ -108,15 +104,16 @@
         throw new Error("Rigol returned an invalid current at target " + targetCurrentAmps + " A");
       }
 
-      const actualCurrentAmps = rigolCurrentAmps < 0 ? 0 : rigolCurrentAmps;
-
+      // PSU-EXT calibration references are unsigned. Do not turn a negative
+      // Rigol reading into a synthetic zero-current point; ask the operator to
+      // correct the setup and retry this point instead.
       if (rigolCurrentAmps < 0) {
-        log("WARN", "Rigol returned negative current; using 0 A for calibration");
+        log("WARN", "Rigol returned a negative current; point not captured. Correct the setup and retry.");
+        index -= 1;
+        continue;
       }
 
-      // PSU-EXT accepts values at 0.1 mA resolution. Strict ordering protects
-      // both the measured-current table and the ADC raw-value table.
-      const calibrationCurrentAmps = Number(actualCurrentAmps.toFixed(4));
+      const calibrationCurrentAmps = Number(rigolCurrentAmps.toFixed(4));
 
       if (calibrationCurrentAmps <= previousActualCurrentAmps) {
         throw new Error(
@@ -128,29 +125,13 @@
 
       write(
         psuExtDeviceId,
-        "CALibration:CURRent CH1,POINt" + (index + 1) + "," + calibrationCurrentAmps.toFixed(4)
+        "CALibration:CURRent CH1,POINt" + (completedPoints + 1) + "," + calibrationCurrentAmps.toFixed(4)
       );
 
-      const capturedPoint = queryRaw(
-        psuExtDeviceId,
-        "CALibration:CURRent? CH1,POINt" + (index + 1)
-      );
-      const capturedValues = capturedPoint.split(",");
-      const capturedRawValue = Number(capturedValues[0]);
-      const capturedActualCurrentAmps = Number(capturedValues[1]);
-
-      if (capturedValues.length !== 2 || !Number.isFinite(capturedRawValue)
-          || !Number.isFinite(capturedActualCurrentAmps)) {
-        throw new Error("PSU-EXT returned an invalid captured point: " + capturedPoint);
-      }
-
-      if (capturedRawValue <= previousCapturedRawValue
-          || capturedActualCurrentAmps <= previousActualCurrentAmps) {
-        throw new Error("PSU-EXT calibration points must increase strictly; captured " + capturedPoint);
-      }
-
-      previousActualCurrentAmps = capturedActualCurrentAmps;
-      previousCapturedRawValue = capturedRawValue;
+      // A successful point command has synchronously captured and staged its
+      // fresh Q16.16 raw coordinate. The device validates raw-coordinate and
+      // PGA ordering on COMMit; do not reinterpret diagnostic query text here.
+      previousActualCurrentAmps = calibrationCurrentAmps;
       completedPoints += 1;
 
       record(new Date(), "calibration-current", "A", rigolCurrentAmps);
