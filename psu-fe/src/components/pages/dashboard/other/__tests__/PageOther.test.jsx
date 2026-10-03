@@ -16,6 +16,8 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { PageOther } from "../PageOther.jsx";
+import { removeOtherWidgetData } from "../otherDashboard.js";
+import { XY_CHART_HISTORY_STORAGE_KEY } from "../../../../widgets/xyChart";
 
 const mockConnection = vi.hoisted(() => ({
   wsConnected: false,
@@ -120,6 +122,50 @@ describe("PageOther", () => {
       type: "chart",
       x: 0,
       y: 3,
+      w: 3,
+      h: 2,
+    });
+  });
+
+  it("deletes X-Y chart history when an X-Y chart widget is removed", () => {
+    window.localStorage.setItem(
+      XY_CHART_HISTORY_STORAGE_KEY,
+      JSON.stringify({ "xy-removed": { points: [] }, "xy-kept": { points: [] } }),
+    );
+
+    removeOtherWidgetData({ id: "xy-removed", type: "xyChart" });
+
+    const histories = JSON.parse(window.localStorage.getItem(XY_CHART_HISTORY_STORAGE_KEY));
+    expect(histories).not.toHaveProperty("xy-removed");
+    expect(histories).toHaveProperty("xy-kept");
+  });
+
+  it("adds X-Y charts from edit mode with selectable 2x2 and 3x2 placements", () => {
+    render(<PageOther />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    fireEvent.change(screen.getByLabelText("Widget type"), {
+      target: { value: "xyChart:xy-chart-other-medium:XY Chart 2x2:2:2" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Add selected widget" }));
+
+    expect(screen.getByText("X-Y Chart")).toBeInTheDocument();
+    expect(screen.getByText("Configure X and Y devices and SCPI queries.")).toBeInTheDocument();
+    expect(JSON.parse(window.localStorage.getItem("psu-ext.dashboard.other-layout.v1")).widgets[0]).toMatchObject({
+      type: "xyChart",
+      x: 0,
+      y: 0,
+      w: 2,
+      h: 2,
+    });
+
+    fireEvent.change(screen.getByLabelText("Widget type"), {
+      target: { value: "xyChart:xy-chart-other-large:XY Chart 3x2:3:2" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Add selected widget" }));
+
+    expect(JSON.parse(window.localStorage.getItem("psu-ext.dashboard.other-layout.v1")).widgets[1]).toMatchObject({
+      type: "xyChart",
       w: 3,
       h: 2,
     });

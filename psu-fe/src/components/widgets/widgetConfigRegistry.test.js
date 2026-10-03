@@ -18,6 +18,7 @@ import { saveChartConfig } from "./chart/chartConfig.js";
 import { saveSingleToggleConfig } from "./singleToggle/singleToggleConfig.js";
 import { saveSingleValueConfig } from "./singleValue/singleValueConfig.js";
 import { getAllRunnableWidgetSubscriptions } from "./widgetConfigRegistry.js";
+import { saveXyChartConfig } from "./xyChart/xyChartConfig.js";
 
 describe("widgetConfigRegistry", () => {
   afterEach(() => {
@@ -64,6 +65,19 @@ describe("widgetConfigRegistry", () => {
         query: "MEAS:VOLT? CH1",
         frequencyHz: 5,
       },
+    ]);
+  });
+
+  it("collects runnable X-Y chart subscriptions for both axes", () => {
+    saveXyChartConfig("xy-home-main", {
+      frequencyHz: 2,
+      x: { deviceName: "PSU1", query: "MEAS:VOLT? CH1" },
+      y: { deviceName: "PSU1", query: "MEAS:CURR? CH1" },
+    });
+
+    expect(getAllRunnableWidgetSubscriptions()).toEqual([
+      { widgetId: "xy-home-main:x", deviceName: "PSU1", query: "MEAS:VOLT? CH1", frequencyHz: 2 },
+      { widgetId: "xy-home-main:y", deviceName: "PSU1", query: "MEAS:CURR? CH1", frequencyHz: 2 },
     ]);
   });
 

@@ -64,6 +64,13 @@ body.dashboard-widget-dragging {
   z-index: 2;
 }
 
+/* The X-Y legend has up to three rows with axis labels and units, so it grows with them instead of using the fixed width. */
+.psu-uplot-xy .u-legend {
+  max-width: calc(100% - 0.5rem);
+  min-width: 8.4rem;
+  width: auto;
+}
+
 .psu-uplot .u-legend.u-inline tr {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(2.75rem, auto);

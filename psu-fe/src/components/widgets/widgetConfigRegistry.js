@@ -22,12 +22,14 @@ import {
 import {
   singleValueWidgetConfigSource,
 } from "./singleValue/singleValueConfig.js";
+import { xyChartWidgetConfigSource } from "./xyChart/xyChartConfig.js";
 
 const widgetConfigSources = new Map();
 
 registerWidgetConfigSource("singleValue", singleValueWidgetConfigSource);
 registerWidgetConfigSource("chart", chartWidgetConfigSource);
 registerWidgetConfigSource("singleToggle", singleToggleWidgetConfigSource);
+registerWidgetConfigSource("xyChart", xyChartWidgetConfigSource);
 
 /**
  * @param {string} widgetType

@@ -20,6 +20,12 @@ import {
   SingleValueCardTitle,
 } from "../../../widgets/singleValue";
 import { deleteStoredWidgetConfig } from "../../../widgets/widgetConfigStore.js";
+import {
+  deleteXyChartHistory,
+  XyChartCard,
+  XyChartCardActions,
+  XyChartCardTitle,
+} from "../../../widgets/xyChart";
 
 /** Configurable dashboard definition for the secondary operator workspace. */
 export const otherDashboard = {
@@ -36,6 +42,8 @@ export const otherDashboard = {
       { type: "chart", label: "Chart 2x1", idPrefix: "chart-other-small", w: 2, h: 1 },
       { type: "chart", label: "Chart 2x2", idPrefix: "chart-other-medium", w: 2, h: 2 },
       { type: "chart", label: "Chart 3x2", idPrefix: "chart-other-large", w: 3, h: 2 },
+      { type: "xyChart", label: "XY Chart 2x2", idPrefix: "xy-chart-other-medium", w: 2, h: 2 },
+      { type: "xyChart", label: "XY Chart 3x2", idPrefix: "xy-chart-other-large", w: 3, h: 2 },
     ],
     definitions: {
       chart: {
@@ -43,6 +51,12 @@ export const otherDashboard = {
         render: ChartCard,
         text: "Live SCPI trend.",
         title: ChartCardTitle,
+      },
+      xyChart: {
+        actions: XyChartCardActions,
+        render: XyChartCard,
+        text: "SCPI X-Y plot.",
+        title: XyChartCardTitle,
       },
       singleValue: {
         actions: SingleValueCardActions,
@@ -58,9 +72,13 @@ export const otherDashboard = {
 /**
  * Removes persisted data that belongs only to a deleted secondary-dashboard widget.
  *
- * @param {{id: string}} placement - Removed widget placement.
+ * @param {{id: string, type?: string}} placement - Removed widget placement.
  * @returns {void}
  */
 export function removeOtherWidgetData(placement) {
   deleteStoredWidgetConfig(placement.id);
+
+  if (placement.type === "xyChart") {
+    deleteXyChartHistory(placement.id);
+  }
 }
