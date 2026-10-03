@@ -17,6 +17,7 @@ import { act, cleanup, fireEvent, render, screen, within } from "@testing-librar
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { XY_CHART_HISTORY_STORAGE_KEY, XyChartCard, XyChartCardActions, XyChartCardTitle } from "../index.js";
 import { WIDGET_CONFIG_STORAGE_KEY } from "../../widgetConfigStore.js";
+import { createDefaultChartStatisticsConfig } from "../../chart/utils/chartStatistics.js";
 import { saveXyChartConfig } from "../xyChartConfig.js";
 
 const mockUplot = vi.hoisted(() => ({
@@ -203,6 +204,7 @@ describe("XyChartCard", () => {
         product: { label: "X·Y", unit: "" },
         x: { label: "Voltage", unit: "V", deviceName: "PSU1", query: "MEAS:VOLT? CH1" },
         y: { label: "Current", unit: "A", deviceName: "PSU1", query: "MEAS:CURR? CH1" },
+        statistics: createDefaultChartStatisticsConfig([{ id: "y" }]),
       },
     });
   });
@@ -243,6 +245,31 @@ describe("XyChartCard", () => {
     fireEvent.click(within(help).getByRole("button", { name: "Close" }));
     expect(screen.queryByRole("dialog", { name: "Pair timeout" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Save" })).toBeInTheDocument();
+  });
+
+  it("shows statistics for the chosen line from the settings dialog", () => {
+    configure();
+    render(
+      <>
+        <XyChartCardActions placement={PLACEMENT} />
+        <XyChartCard placement={PLACEMENT} />
+      </>,
+    );
+    publish(X, "1", 100);
+    publish(Y, "0.1", 110);
+    publish(X, "3", 200);
+    publish(Y, "0.5", 210);
+    expect(screen.queryByTestId("chart-statistics")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Configure X-Y chart card" }));
+    fireEvent.click(screen.getByRole("button", { name: "Show statistics" }));
+    fireEvent.change(screen.getByLabelText("Statistics series"), { target: { value: "x" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    const panel = screen.getByTestId("chart-statistics");
+    expect(panel).toHaveTextContent("Voltage stats");
+    expect(panel).toHaveTextContent(/Min\s*1(\.0+)? V/);
+    expect(panel).toHaveTextContent(/Max\s*3(\.0+)? V/);
   });
 
   it("blocks saving while a query is invalid", () => {

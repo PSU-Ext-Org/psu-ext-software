@@ -569,6 +569,10 @@ available as `XY Chart 2x2` and `XY Chart 3x2` on the operator and other dashboa
   each with its own value and unit (for example `Current: 0.25 A`) at the point nearest the cursor, or the latest
   point when the cursor is off the plot. The X row uses the Y line's color. Click
   the plot to lock the cursor on a point and click again to unlock it.
+- Statistics work like the regular chart's (`Show statistics` in the settings dialog, same statistic list and
+  defaults). `Statistics series` picks the Y line (default), X, or the X·Y line while it is shown, and values use
+  that line's unit. When the plot is zoomed, only points inside the zoom box on that line are counted: X and Y use
+  the X and Y scales, X·Y uses the X and X·Y scales. Statistics also appear in the exported PNG.
 - The optional `X·Y line` (off by default) plots `x * y` of every point against the same X on a right-hand axis
   with its own label, unit, and color, for example power (W) next to an I-V curve.
 - Points are stored in browser `localStorage` (`psu-ext.xy-chart-history.v1`), like regular chart history, so

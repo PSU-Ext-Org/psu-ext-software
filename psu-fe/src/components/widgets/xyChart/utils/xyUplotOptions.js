@@ -22,6 +22,9 @@ export const DEFAULT_PRODUCT_AXIS = Object.freeze({ label: "X·Y", unit: "" });
 export const DEFAULT_PRODUCT_COLOR = "#dc2626";
 const X_AXIS_SIZE = 52;
 const Y_AXIS_SIZE = 72;
+const PLOT_PADDING_RIGHT = 10;
+/** Width in CSS px taken at the right edge of the chart by the X·Y axis and the plot padding. */
+export const PRODUCT_AXIS_RESERVED_WIDTH = Y_AXIS_SIZE + PLOT_PADDING_RIGHT;
 
 /**
  * Builds a path that connects points in acquisition order. uPlot's default linear builder assumes ascending
@@ -178,7 +181,7 @@ export function createXyUplotOptions({
       },
     },
     legend: { show: false },
-    padding: [22, 10, 4, 4],
+    padding: [22, PLOT_PADDING_RIGHT, 4, 4],
     scales,
     axes,
     series,

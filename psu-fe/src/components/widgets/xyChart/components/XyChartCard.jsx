@@ -14,11 +14,12 @@
  * limitations under the License.
  */
 import { ScatterChart } from "lucide-react";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useWebSocketConnection } from "../../../../connection/ws-proxy/WebSocketConnectionContext.jsx";
 import { useXyChartData } from "../hooks/useXyChartData.js";
 import { XyChartRenderer } from "../renderers/XyChartRendererUplot.jsx";
 import { getXyStatusText, getXyTargetText } from "../utils/xyChartStatus.js";
+import { computeXyStatistics } from "../utils/xyStatistics.js";
 import { DEFAULT_XY_CHART_CONFIG, isXyChartConfigured, useXyChartConfig } from "../xyChartConfig.js";
 
 /**
@@ -54,6 +55,11 @@ export function XyChartCard({ placement }) {
     getScpiQuerySnapshot,
     subscribeScpiSnapshot,
   });
+  const [visibleRanges, setVisibleRanges] = useState(null);
+  const { statistics, statisticsSeries, unit: statisticsUnit } = useMemo(
+    () => computeXyStatistics({ points, config, visibleRanges }),
+    [config, points, visibleRanges],
+  );
   const configured = isXyChartConfigured(config);
   const statusText = useMemo(
     () => getXyStatusText({ config, devices, deviceStatuses, snapshots, wsConnected }),
@@ -75,11 +81,16 @@ export function XyChartCard({ placement }) {
       <XyChartRenderer
         chartExport={{ id: placement.id, fileStem: config.cardName }}
         lineColor={config.lineColor}
+        onVisibleRangesChange={setVisibleRanges}
         points={points}
         productAxis={config.product}
         productColor={config.productColor}
         showLine={config.showLine}
         showProduct={config.showProduct}
+        statistics={statistics}
+        statisticsConfig={config.statistics}
+        statisticsSeries={statisticsSeries}
+        statisticsUnit={statisticsUnit}
         statusText={statusText}
         targetText={getXyTargetText(config)}
         usageText={usageText}

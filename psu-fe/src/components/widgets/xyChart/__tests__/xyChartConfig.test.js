@@ -15,8 +15,10 @@
  */
 import { afterEach, describe, expect, it } from "vitest";
 import { DEFAULT_CHART_HISTORY_LIMIT_BYTES, MAX_CHART_HISTORY_BYTES } from "../../chart/storage/chartHistoryStorage.js";
+import { createDefaultChartStatisticsConfig } from "../../chart/utils/chartStatistics.js";
 import {
   DEFAULT_XY_CHART_CONFIG,
+  getXyStatisticsSeries,
   isXyChartConfigured,
   loadRunnableXySubscriptions,
   loadXyChartConfig,
@@ -38,6 +40,11 @@ const CONFIGURED = {
   product: { label: "Power", unit: "W" },
   x: { label: "Voltage", unit: "V", deviceName: "PSU1", query: "MEAS:VOLT? CH1" },
   y: { label: "Current", unit: "A", deviceName: "PSU1", query: "MEAS:CURR? CH1" },
+  statistics: {
+    ...createDefaultChartStatisticsConfig([{ id: "y" }]),
+    showStatistics: true,
+    seriesId: "product",
+  },
 };
 
 describe("xy chart config", () => {
@@ -108,6 +115,28 @@ describe("xy chart config", () => {
     expect(config.showProduct).toBe(false);
     expect(config.productColor).toBe(DEFAULT_XY_CHART_CONFIG.productColor);
     expect(config.product).toEqual({ label: "X·Y", unit: "w".repeat(16) });
+  });
+
+  it("defaults statistics to off for the Y line and keeps a valid series choice", () => {
+    expect(normalizeXyChartConfig({ type: "xyChart" }).statistics).toEqual(createDefaultChartStatisticsConfig([{ id: "y" }]));
+    expect(normalizeXyChartConfig({ type: "xyChart", statistics: { seriesId: "x" } }).statistics.seriesId).toBe("x");
+  });
+
+  it("falls back to the Y line when X·Y statistics are chosen but the X·Y line is off", () => {
+    const config = normalizeXyChartConfig({ ...CONFIGURED, type: "xyChart", showProduct: false });
+
+    expect(config.statistics.seriesId).toBe("y");
+  });
+
+  it("lists X·Y as a statistics series only while the X·Y line is shown", () => {
+    const config = normalizeXyChartConfig({ ...CONFIGURED, type: "xyChart" });
+
+    expect(getXyStatisticsSeries(config)).toEqual([
+      { id: "y", label: "Current" },
+      { id: "x", label: "Voltage" },
+      { id: "product", label: "Power" },
+    ]);
+    expect(getXyStatisticsSeries({ ...config, showProduct: false }).map((series) => series.id)).toEqual(["y", "x"]);
   });
 
   it("reports whether both axes are configured", () => {

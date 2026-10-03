@@ -28,6 +28,10 @@ import {
   DEFAULT_CHART_HISTORY_LIMIT_BYTES,
   MAX_CHART_HISTORY_BYTES,
 } from "../chart/storage/chartHistoryStorage.js";
+import {
+  createDefaultChartStatisticsConfig,
+  normalizeChartStatisticsConfig,
+} from "../chart/utils/chartStatistics.js";
 import { DEFAULT_PAIR_TIMEOUT_MS } from "./utils/xyPairing.js";
 
 export const XY_CHART_TYPE = "xyChart";
@@ -54,6 +58,7 @@ export const DEFAULT_XY_CHART_CONFIG = Object.freeze({
   product: DEFAULT_XY_AXIS_PRODUCT,
   x: DEFAULT_XY_AXIS_X,
   y: DEFAULT_XY_AXIS_Y,
+  statistics: createDefaultChartStatisticsConfig([{ id: "y" }]),
 });
 
 /**
@@ -120,7 +125,7 @@ export function normalizeXyChartConfig(candidate) {
     return cloneDefaultXyChartConfig();
   }
 
-  return {
+  const config = {
     type: XY_CHART_TYPE,
     cardName: String(candidate.cardName || DEFAULT_XY_CHART_CONFIG.cardName).trim().slice(0, 48),
     frequencyHz: normalizeFrequency(candidate.frequencyHz),
@@ -144,6 +149,30 @@ export function normalizeXyChartConfig(candidate) {
     x: normalizeAxis(candidate.x, DEFAULT_XY_AXIS_X),
     y: normalizeAxis(candidate.y, DEFAULT_XY_AXIS_Y),
   };
+
+  return {
+    ...config,
+    statistics: normalizeChartStatisticsConfig(candidate.statistics, getXyStatisticsSeries(config)),
+  };
+}
+
+/**
+ * Lines the statistics panel can summarize, in the order shown in settings. Y comes first and is the default.
+ *
+ * @param {{x: {label?: string}, y: {label?: string}, product?: {label?: string}, showProduct?: boolean}} config
+ * @returns {Array<{id: "x" | "y" | "product", label: string}>}
+ */
+export function getXyStatisticsSeries(config) {
+  const series = [
+    { id: "y", label: String(config.y?.label || "").trim() || DEFAULT_XY_AXIS_Y.label },
+    { id: "x", label: String(config.x?.label || "").trim() || DEFAULT_XY_AXIS_X.label },
+  ];
+
+  if (config.showProduct) {
+    series.push({ id: "product", label: String(config.product?.label || "").trim() || DEFAULT_XY_AXIS_PRODUCT.label });
+  }
+
+  return series;
 }
 
 /**
@@ -193,6 +222,10 @@ function cloneDefaultXyChartConfig() {
     product: { ...DEFAULT_XY_AXIS_PRODUCT },
     x: { ...DEFAULT_XY_AXIS_X },
     y: { ...DEFAULT_XY_AXIS_Y },
+    statistics: {
+      ...DEFAULT_XY_CHART_CONFIG.statistics,
+      enabledStats: { ...DEFAULT_XY_CHART_CONFIG.statistics.enabledStats },
+    },
   };
 }
 

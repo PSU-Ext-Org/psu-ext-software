@@ -23,6 +23,7 @@ import {
   createXyLegendRows,
   createXyUplotOptions,
   nearestXyPointIdx,
+  PRODUCT_AXIS_RESERVED_WIDTH,
 } from "../utils/xyUplotOptions.js";
 import { formatAxisLabel, paddedValueRange, toXyUplotData } from "../utils/xyPlotData.js";
 
@@ -186,6 +187,63 @@ describe("XyChartRendererUplot", () => {
 
     expect(plot.setScale).toHaveBeenCalledWith("x", { min: 1, max: 2 });
     expect(plot.setScale).toHaveBeenCalledWith("y", { min: 10, max: 20 });
+  });
+
+  it("reports the zoomed ranges for statistics and clears them on reset", () => {
+    const onVisibleRangesChange = vi.fn();
+    renderChart({ onVisibleRangesChange });
+    const plot = mockUplot.instances[0];
+    const [scaleChange] = plot.options.hooks.setScale;
+
+    scaleChange(plot, "x");
+    expect(onVisibleRangesChange).not.toHaveBeenCalled();
+
+    plot.options.cursor.bind.mousedown(plot, null, () => {})({ button: 0 });
+    scaleChange(plot, "x");
+    scaleChange(plot, "y");
+    expect(onVisibleRangesChange).toHaveBeenLastCalledWith({ x: { min: 1, max: 2 }, y: { min: 10, max: 20 } });
+
+    plot.options.cursor.bind.dblclick(plot, null, () => {})({});
+    expect(onVisibleRangesChange).toHaveBeenLastCalledWith(null);
+  });
+
+  it("shows the statistics panel when statistics are calculated", () => {
+    renderChart({
+      statistics: { sampleCount: 3, values: { min: 0.1, max: 0.3, ripplePeakToPeak: 0.2 } },
+      statisticsConfig: { showStatistics: true, enabledStats: { min: true, max: true, ripplePeakToPeak: true } },
+      statisticsSeries: { id: "y", label: "Current" },
+      statisticsUnit: "A",
+    });
+
+    expect(screen.getByTestId("chart-statistics")).toHaveTextContent("Current stats");
+  });
+
+  it("keeps the statistics panel clear of the X·Y axis", () => {
+    const statisticsProps = {
+      statistics: { sampleCount: 3, values: { min: 0.1 } },
+      statisticsConfig: { showStatistics: true, enabledStats: { min: true } },
+      statisticsSeries: { id: "y", label: "Current" },
+      statisticsUnit: "A",
+    };
+    const { rerender } = renderChart(statisticsProps);
+    const panelRight = () => screen.getByTestId("chart-statistics").parentElement.style.right;
+    expect(panelRight()).toBe("12px");
+
+    rerender(
+      <XyChartRenderer
+        lineColor="#2563eb"
+        points={POINTS}
+        showLine
+        showProduct
+        statusText="Waiting"
+        targetText="PSU1"
+        usageText="3 / 2000 pts"
+        xAxis={X_AXIS}
+        yAxis={Y_AXIS}
+        {...statisticsProps}
+      />,
+    );
+    expect(panelRight()).toBe(`${PRODUCT_AXIS_RESERVED_WIDTH + 12}px`);
   });
 
   it("forgets the zoom on double click", () => {

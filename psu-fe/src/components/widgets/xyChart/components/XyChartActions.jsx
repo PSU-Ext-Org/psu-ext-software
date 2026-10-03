@@ -18,13 +18,13 @@ import { useEffect, useMemo, useState } from "react";
 import { useModalDialog } from "../../../layout/hooks/useModalDialog.js";
 import { SlidingToggle } from "../../../forms/SlidingToggle.jsx";
 import { ValidationMessage } from "../../../forms/ValidationMessage.jsx";
-import { ChartImageExportButton } from "../../chart/index.js";
+import { ChartImageExportButton, ChartStatisticsSettings } from "../../chart/index.js";
 import { useWebSocketConnection } from "../../../../connection/ws-proxy/WebSocketConnectionContext.jsx";
 import { connectedDevices } from "../../../../connection/ws-proxy/device/deviceRegistry.js";
 import { MAX_CHART_HISTORY_BYTES } from "../../chart/storage/chartHistoryStorage.js";
 import { deleteXyChartHistory } from "../storage/xyChartHistoryStorage.js";
 import { validateXyChartDraft } from "../utils/xyChartStatus.js";
-import { saveXyChartConfig, useXyChartConfig } from "../xyChartConfig.js";
+import { getXyStatisticsSeries, saveXyChartConfig, useXyChartConfig } from "../xyChartConfig.js";
 import { XyAxisFields } from "./XyAxisFields.jsx";
 import { XyPairTimeoutInfoButton } from "./XyPairTimeoutInfoButton.jsx";
 
@@ -239,6 +239,13 @@ function XyChartSettingsButton({ placement }) {
                 </div>
               ) : null}
             </div>
+
+            <ChartStatisticsSettings
+              idPrefix="xy-chart-stat"
+              onChange={(statistics) => updateDraft("statistics", statistics)}
+              series={getXyStatisticsSeries(draft)}
+              statistics={draft.statistics}
+            />
 
             <ValidationMessage message={errors[0]} />
 

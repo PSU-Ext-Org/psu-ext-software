@@ -21,6 +21,9 @@ export {
 } from "./components/ChartCard.jsx";
 export { ScriptResultChart } from "./components/ScriptResultChart.jsx";
 export { ChartImageExportButton } from "./components/ChartImageExportButton.jsx";
+export { ChartStatisticsPanel } from "./components/ChartStatisticsPanel.jsx";
+export { ChartStatisticsSettings } from "./components/ChartStatisticsSettings.jsx";
+export { createChartStatisticsPresentation } from "./utils/chartStatisticsPresentation.js";
 export { useRegisterChartImageExport } from "./export/chartExportRegistry.js";
 export {
   composeChartPngCanvas,

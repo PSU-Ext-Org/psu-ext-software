@@ -17,7 +17,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import uPlot from "uplot";
 import "uplot/dist/uPlot.min.css";
 import {
+  ChartStatisticsPanel,
   composeChartPngCanvas,
+  createChartStatisticsPresentation,
   createChartPngFileName,
   createUplotCursorOverlay,
   downloadChartPng,
@@ -32,9 +34,14 @@ import {
   DEFAULT_CHART_WIDTH,
   DEFAULT_PRODUCT_AXIS,
   DEFAULT_PRODUCT_COLOR,
+  PRODUCT_AXIS_RESERVED_WIDTH,
 } from "../utils/xyUplotOptions.js";
 
 const ZOOM_SCALES = Object.freeze(["x", "y", "xy"]);
+// The statistics panel sits top-right like the regular chart's. When the X·Y axis is shown, it keeps the same gap
+// to the left of that axis instead of covering its tick labels.
+const STATISTICS_RIGHT = 12;
+const STATISTICS_RIGHT_WITH_PRODUCT_AXIS = PRODUCT_AXIS_RESERVED_WIDTH + STATISTICS_RIGHT;
 
 /**
  * uPlot renderer for X-Y point data. Uses uPlot's faceted `mode: 2`, so X does not have to be sorted.
@@ -49,6 +56,12 @@ const ZOOM_SCALES = Object.freeze(["x", "y", "xy"]);
  * @param {boolean} [props.showProduct] - Also plot `x * y` against X on a right-hand axis.
  * @param {{label: string, unit: string}} [props.productAxis]
  * @param {string} [props.productColor]
+ * @param {(ranges: import("../utils/xyStatistics.js").XyVisibleRanges | null) => void} [props.onVisibleRangesChange]
+ *   Called with the zoomed scale ranges after a zoom, and with null when the zoom is reset.
+ * @param {{sampleCount?: number, values?: Record<string, number | null>} | null} [props.statistics]
+ * @param {{enabledStats?: Record<string, boolean>, showStatistics?: boolean}} [props.statisticsConfig]
+ * @param {{label?: string}} [props.statisticsSeries]
+ * @param {string} [props.statisticsUnit]
  * @param {string} props.statusText
  * @param {string} props.targetText
  * @param {string} props.usageText
@@ -64,6 +77,11 @@ export function XyChartRenderer({
   showProduct = false,
   productAxis = DEFAULT_PRODUCT_AXIS,
   productColor = DEFAULT_PRODUCT_COLOR,
+  onVisibleRangesChange,
+  statistics = null,
+  statisticsConfig,
+  statisticsSeries,
+  statisticsUnit = "",
   statusText,
   targetText,
   usageText,
@@ -74,6 +92,8 @@ export function XyChartRenderer({
   const exportSnapshotRef = useRef(null);
   const zoomRef = useRef({ captureNext: false, suppress: false, ranges: null });
   const [cursorIdx, setCursorIdx] = useState(null);
+  const onVisibleRangesChangeRef = useRef(onVisibleRangesChange);
+  onVisibleRangesChangeRef.current = onVisibleRangesChange;
   const chartData = useMemo(() => toXyUplotData(points, showProduct), [points, showProduct]);
   const chartDataRef = useRef(chartData);
   const hasPoints = chartData.totalPoints > 0;
@@ -105,6 +125,12 @@ export function XyChartRenderer({
     fileStem: chartExport?.fileStem,
     headerText,
     legend: { points, xAxis, yAxis, lineColor, showProduct, productAxis, productColor },
+    statistics: createChartStatisticsPresentation({
+      statisticsConfig,
+      statisticsSeries,
+      stats: statistics,
+      unit: statisticsUnit,
+    }),
     usageText,
   };
   const exportPng = useCallback(async () => {
@@ -124,7 +150,7 @@ export function XyChartRenderer({
       }),
       plotCanvas: plot.ctx.canvas,
       rootElement,
-      statistics: null,
+      statistics: snapshot.statistics,
       usageText: snapshot.usageText,
     });
     await downloadChartPng(canvas, createChartPngFileName(snapshot.fileStem));
@@ -144,9 +170,14 @@ export function XyChartRenderer({
         onResetZoom: () => {
           zoom.captureNext = false;
           zoom.ranges = null;
+          onVisibleRangesChangeRef.current?.(null);
         },
         onCursorPoint: setCursorIdx,
-        onScaleChange: (plot, scaleKey) => captureUserScale(zoom, plot, scaleKey),
+        onScaleChange: (plot, scaleKey) => {
+          if (captureUserScale(zoom, plot, scaleKey)) {
+            onVisibleRangesChangeRef.current?.(zoom.ranges);
+          }
+        },
         onStartZoom: () => {
           zoom.captureNext = true;
         },
@@ -221,6 +252,17 @@ export function XyChartRenderer({
       </div>
       <div className="absolute inset-0 overflow-hidden rounded-md pt-1" ref={rootRef} />
       <XyChartLegend rows={legendRows} />
+      <div
+        className="pointer-events-none absolute top-8 z-10 w-max max-w-[calc(100%-1.5rem)]"
+        style={{ right: showProduct ? STATISTICS_RIGHT_WITH_PRODUCT_AXIS : STATISTICS_RIGHT }}
+      >
+        <ChartStatisticsPanel
+          statisticsConfig={statisticsConfig}
+          statisticsSeries={statisticsSeries}
+          stats={statistics}
+          unit={statisticsUnit}
+        />
+      </div>
     </div>
   );
 }
@@ -228,13 +270,16 @@ export function XyChartRenderer({
 
 function captureUserScale(zoom, plot, scaleKey) {
   if (zoom.suppress || !zoom.captureNext || !ZOOM_SCALES.includes(scaleKey)) {
-    return;
+    return false;
   }
 
   const scale = plot.scales?.[scaleKey];
-  if (Number.isFinite(scale?.min) && Number.isFinite(scale?.max)) {
-    zoom.ranges = { ...zoom.ranges, [scaleKey]: { min: scale.min, max: scale.max } };
+  if (!Number.isFinite(scale?.min) || !Number.isFinite(scale?.max)) {
+    return false;
   }
+
+  zoom.ranges = { ...zoom.ranges, [scaleKey]: { min: scale.min, max: scale.max } };
+  return true;
 }
 
 function updatePlotData(plot, zoom, data) {
