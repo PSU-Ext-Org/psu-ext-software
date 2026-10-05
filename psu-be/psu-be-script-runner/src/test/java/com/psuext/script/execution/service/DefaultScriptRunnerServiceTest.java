@@ -64,6 +64,28 @@ class DefaultScriptRunnerServiceTest {
     private Path temporaryDirectory;
 
     @Test
+    void omittedTimeoutUsesConfiguredDefault() {
+        ScriptRuntimeProperties properties = new ScriptRuntimeProperties();
+        properties.setDefaultTimeout(Duration.ofMillis(100));
+        runWithRunner(properties, context -> {
+            ScriptRunnerService runner = context.getBean(ScriptRunnerService.class);
+            ScriptTaskId taskId = runner.start(slowRequest(null));
+            assertThat(awaitResult(runner, taskId).finalStatus()).isEqualTo(ScriptTaskState.TIMED_OUT);
+        });
+    }
+
+    @Test
+    void explicitTimeoutOverridesConfiguredDefault() {
+        ScriptRuntimeProperties properties = new ScriptRuntimeProperties();
+        properties.setDefaultTimeout(Duration.ofHours(1));
+        runWithRunner(properties, context -> {
+            ScriptRunnerService runner = context.getBean(ScriptRunnerService.class);
+            ScriptTaskId taskId = runner.start(slowRequest(Duration.ofMillis(100)));
+            assertThat(awaitResult(runner, taskId).finalStatus()).isEqualTo(ScriptTaskState.TIMED_OUT);
+        });
+    }
+
+    @Test
     void successfulTaskStoresResultAndLog() {
         runWithRunner(context -> {
             ScriptRunnerService runner = context.getBean(ScriptRunnerService.class);

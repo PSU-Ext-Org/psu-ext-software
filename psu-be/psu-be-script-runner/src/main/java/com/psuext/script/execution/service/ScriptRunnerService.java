@@ -35,7 +35,7 @@ import com.psuext.script.execution.model.ScriptTaskSnapshot;
 public interface ScriptRunnerService {
 
     /**
-     * Starts one background script task.
+     * Starts one background script task, using the configured default timeout when the request omits it.
      *
      * @param request task request
      * @return generated task id

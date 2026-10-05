@@ -41,11 +41,11 @@ class ScriptModelTest {
     }
 
     @Test
-    void startRequestDefaultsNameAndTimeout() {
+    void startRequestDefaultsNameAndPreservesOmittedTimeout() {
         ScriptStartRequest request = new ScriptStartRequest(" ", "return 1;", null);
 
         assertThat(request.name()).isEqualTo("Untitled script");
-        assertThat(request.timeout()).isEqualTo(Duration.ofMinutes(70));
+        assertThat(request.timeout()).isNull();
     }
 
     @Test

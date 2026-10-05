@@ -132,7 +132,11 @@ The public script task model lives under `com.psuext.script.execution.model`. Th
 records and enums define task identity, start requests, live snapshots,
 terminal results, error details, and time-value series.
 
-`ScriptStartRequest` defaults a missing timeout to five minutes. Terminal
+The runner resolves an omitted request timeout from `psu.scripts.runtime.default-timeout`.
+The code fallback and the shipped `application.yaml` both use one hour (`1h`).
+Precedence is: explicit request timeout, configured property, then the code fallback.
+Timeouts must be positive, and the deadline includes queue time and operator input waits.
+Terminal
 `ScriptTaskResult` instances require `COMPLETED`, `FAILED`, `CANCELLED`, or
 `TIMED_OUT` as the final status. Result collections are copied on construction
 so stored results are immutable boundary objects.
@@ -520,6 +524,7 @@ for one hour, with a maximum of 500 completed tasks. Configure these limits:
 psu:
   scripts:
     runtime:
+      default-timeout: 1h
       maximum-completed-tasks: 500
       completed-task-retention: 1h
 ```

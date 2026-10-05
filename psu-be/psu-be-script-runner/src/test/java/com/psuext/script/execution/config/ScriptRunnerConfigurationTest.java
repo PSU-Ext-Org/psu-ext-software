@@ -72,6 +72,27 @@ class ScriptRunnerConfigurationTest {
         });
     }
 
+    @Test
+    void defaultsTimeoutToOneHourWithoutProperty() {
+        contextRunner.run(context -> assertThat(context.getBean(ScriptRuntimeProperties.class).getDefaultTimeout())
+                .isEqualTo(java.time.Duration.ofHours(1)));
+    }
+
+    @Test
+    void bindsConfiguredDefaultTimeout() {
+        contextRunner.withPropertyValues("psu.scripts.runtime.default-timeout=25m").run(context ->
+                assertThat(context.getBean(ScriptRuntimeProperties.class).getDefaultTimeout())
+                        .isEqualTo(java.time.Duration.ofMinutes(25)));
+    }
+
+    @Test
+    void rejectsNonPositiveDefaultTimeout() {
+        for (String timeout : new String[] {"0s", "-1s"}) {
+            contextRunner.withPropertyValues("psu.scripts.runtime.default-timeout=" + timeout)
+                    .run(context -> assertThat(context).hasFailed());
+        }
+    }
+
     private static void await(CountDownLatch started, CountDownLatch release) {
         started.countDown();
         try {

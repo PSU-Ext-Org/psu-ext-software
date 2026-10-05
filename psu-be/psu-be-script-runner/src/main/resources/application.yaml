@@ -42,6 +42,7 @@ psu:
     execution:
       maximum-sleep: 5m
     runtime:
+      default-timeout: 1h
       maximum-completed-tasks: 500
       completed-task-retention: 1h
     executors:
