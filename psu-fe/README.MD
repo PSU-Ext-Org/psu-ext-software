@@ -548,6 +548,44 @@ Dashboard chart headers provide an Export action beside the history-clear and se
 - PNG filenames use the chart name (or Script Runner task identifier) and a local timestamp.
 - Image export currently supports only the `uplot` renderer. With `PSU_CHART_RENDERER=svg`, Export displays `Export not supported yet`.
 
+### X-Y Chart Widget
+
+The `xyChart` widget (`src/components/widgets/xyChart/`) plots one SCPI query against another instead of
+plotting against time, for example `MEAS:CURR? CH1` (Y) against `MEAS:VOLT? CH1` (X) for an I-V curve. It is
+available as `XY Chart 2x2` and `XY Chart 3x2` on the operator and other dashboards.
+
+- Each axis has its own device, SCPI query, label, and unit in the settings dialog. Both queries must be valid
+  queries (containing `?`).
+- X and Y subscribe to the shared SCPI scheduler as two separate subscriptions (`<widgetId>:x` and `<widgetId>:y`),
+  so they are polled independently at the widget's `Frequency (Hz)` and share polling with any other widget that
+  uses the same device and query.
+- Because the two responses arrive separately, points are paired as follows: when one axis gets a fresh value the
+  widget waits up to `Pair timeout (ms)` (default `1000`, `50`-`10000`) for the other axis. If both update in time,
+  the point uses the two fresh values. On timeout the point uses the fresh value and the latest known value of the
+  other axis, stamped with the latest update time of the pair. Nothing is drawn until both axes have reported once.
+- Points are drawn as markers, optionally connected by a line in acquisition order (`Connect points with a line`).
+  X does not have to be sorted, so a sweep in either direction plots correctly. Drag to zoom, double-click to reset.
+- The legend is laid out like the regular chart's live legend: an X row, then the Y line and the optional X·Y line,
+  each with its own value and unit (for example `Current: 0.25 A`) at the point nearest the cursor, or the latest
+  point when the cursor is off the plot. The X row uses the Y line's color. Click
+  the plot to lock the cursor on a point and click again to unlock it.
+- Statistics work like the regular chart's (`Show statistics` in the settings dialog, same statistic list and
+  defaults). `Statistics series` picks the Y line (default), X, or the X·Y line while it is shown, and values use
+  that line's unit. When the plot is zoomed, only points inside the zoom box on that line are counted: X and Y use
+  the X and Y scales, X·Y uses the X and X·Y scales. Statistics also appear in the exported PNG.
+- The optional `X·Y line` (off by default) plots `x * y` of every point against the same X on a right-hand axis
+  with its own label, unit, and color, for example power (W) next to an I-V curve.
+- Points are stored in browser `localStorage` (`psu-ext.xy-chart-history.v1`), like regular chart history, so
+  they are shown again after a reload. Each chart has a `History cap (KiB)` (default and maximum `256 KiB`);
+  when it is reached, the oldest points are discarded first. The header shows usage against the cap in `KiB`.
+- Stored points are shown only while the X and Y devices and queries match the ones they were recorded with.
+  Changing a device or query starts an empty plot. The header `Clear` button deletes the stored points, and
+  removing the widget from a dashboard deletes them too.
+- The plot is implemented directly on uPlot's faceted `mode: 2`; it does not use the `PSU_CHART_RENDERER` selection.
+- The header `Export` button downloads a PNG of the plot the same way as [Chart Image Export](#chart-image-export).
+  The image legend uses the locked cursor point, or the latest point when the cursor is not locked. There are no
+  statistics.
+
 ## Build
 
 ```bash

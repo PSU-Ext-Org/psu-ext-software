@@ -45,6 +45,12 @@ import {
   TimerQueueCardTitle,
 } from "../../../widgets/timerQueue";
 import { deleteStoredWidgetConfig } from "../../../widgets/widgetConfigStore.js";
+import {
+  deleteXyChartHistory,
+  XyChartCard,
+  XyChartCardActions,
+  XyChartCardTitle,
+} from "../../../widgets/xyChart";
 
 /** Configurable dashboard definition for the primary operator workspace. */
 export const operatorDashboard = {
@@ -65,6 +71,8 @@ export const operatorDashboard = {
       { type: "chart", label: "Chart 2x1", idPrefix: "chart-dashboard-small", w: 2, h: 1 },
       { type: "chart", label: "Chart 2x2", idPrefix: "chart-dashboard-medium", w: 2, h: 2 },
       { type: "chart", label: "Chart 3x2", idPrefix: "chart-dashboard-large", w: 3, h: 2 },
+      { type: "xyChart", label: "XY Chart 2x2", idPrefix: "xy-chart-dashboard-medium", w: 2, h: 2 },
+      { type: "xyChart", label: "XY Chart 3x2", idPrefix: "xy-chart-dashboard-large", w: 3, h: 2 },
     ],
     definitions: {
       chart: {
@@ -72,6 +80,12 @@ export const operatorDashboard = {
         render: ChartCard,
         text: "Live SCPI trend.",
         title: ChartCardTitle,
+      },
+      xyChart: {
+        actions: XyChartCardActions,
+        render: XyChartCard,
+        text: "SCPI X-Y plot.",
+        title: XyChartCardTitle,
       },
       singleValue: {
         actions: SingleValueCardActions,
@@ -119,5 +133,9 @@ export function removeOperatorWidgetData(placement) {
 
   if (placement.type === "chart") {
     deleteChartHistory(placement.id);
+  }
+
+  if (placement.type === "xyChart") {
+    deleteXyChartHistory(placement.id);
   }
 }
