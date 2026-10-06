@@ -56,12 +56,17 @@ class TcpScpiTransportTest {
 
     @Test
     void sameTargetConnectIsNoOp() throws Exception {
-        try (FakeScpiTcpServer server = FakeScpiTcpServer.start()) {
+        try (FakeScpiTcpServer server = FakeScpiTcpServer.start().respondTo("*IDN?", IDN_RESPONSE)) {
             TcpScpiTransport transport = transport(server.port());
+            ScpiConnectionRequest request = new ScpiConnectionRequest("127.0.0.1", server.port());
 
-            transport.connect(new ScpiConnectionRequest("127.0.0.1", server.port()));
-            transport.connect(new ScpiConnectionRequest("127.0.0.1", server.port()));
+            assertThat(transport.connect(request).ok()).isTrue();
+            // Connecting to the same target again should reuse the existing TCP connection.
+            assertThat(transport.connect(request).ok()).isTrue();
+            // A reply confirms the connection still works and the server has accepted it before we count.
+            assertTextResponse(transport.send("*IDN?"), IDN_RESPONSE);
 
+            // An unnecessary reconnect would cause the server to accept a second connection.
             assertThat(server.acceptCount()).isEqualTo(1);
         }
     }
