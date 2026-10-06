@@ -50,7 +50,8 @@ class ScriptCancelControllerTest extends ScriptControllerTestSupport {
                 .expectBody(String.class).value(body -> assertThat(body)
                         .contains("\"taskId\":\"" + taskId + "\"")
                         .contains("\"accepted\":true")
-                        .contains("\"state\":\"CANCELLING\""));
+                        // Cancellation may finish before the controller takes its state snapshot.
+                        .containsAnyOf("\"state\":\"CANCELLING\"", "\"state\":\"CANCELLED\""));
 
         awaitState(taskId, "CANCELLED");
         awaitStoredResult(taskId);
