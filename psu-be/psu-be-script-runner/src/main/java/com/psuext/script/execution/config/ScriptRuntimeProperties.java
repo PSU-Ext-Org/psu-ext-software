@@ -25,13 +25,27 @@ import java.time.Duration;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
- * In-memory retention limits for completed script tasks and their live events.
+ * Default task timeout and in-memory retention limits for completed tasks and live events.
  */
 @ConfigurationProperties("psu.scripts.runtime")
 public class ScriptRuntimeProperties {
 
+    private Duration defaultTimeout = Duration.ofHours(1);
     private int maximumCompletedTasks = 500;
     private Duration completedTaskRetention = Duration.ofHours(1);
+
+    /** Returns the task timeout used when a request omits it; defaults to one hour. */
+    public Duration getDefaultTimeout() {
+        return defaultTimeout;
+    }
+
+    /** Sets the positive default task timeout; explicit request timeouts take precedence. */
+    public void setDefaultTimeout(Duration defaultTimeout) {
+        if (defaultTimeout == null || defaultTimeout.isZero() || defaultTimeout.isNegative()) {
+            throw new IllegalArgumentException("default-timeout must be positive");
+        }
+        this.defaultTimeout = defaultTimeout;
+    }
 
     /** Returns the maximum number of completed task snapshots retained in memory. */
     public int getMaximumCompletedTasks() {

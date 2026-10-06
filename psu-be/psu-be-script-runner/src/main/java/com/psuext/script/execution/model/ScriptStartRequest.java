@@ -27,18 +27,13 @@ import java.time.Duration;
  *
  * @param name human-readable task name, or a generated default when blank
  * @param source JavaScript source to execute
- * @param timeout maximum task runtime
+ * @param timeout maximum task runtime, or null to use the configured runner default
  */
 public record ScriptStartRequest(
         String name,
         String source,
         Duration timeout
 ) {
-
-    /**
-     * Default maximum runtime used when a request does not provide a timeout.
-     */
-    public static final Duration DEFAULT_TIMEOUT = Duration.ofMinutes(70);
 
     public ScriptStartRequest {
         if (source == null || source.isBlank()) {
@@ -49,9 +44,7 @@ public record ScriptStartRequest(
         } else {
             name = name.trim();
         }
-        if (timeout == null) {
-            timeout = DEFAULT_TIMEOUT;
-        } else if (timeout.isZero() || timeout.isNegative()) {
+        if (timeout != null && (timeout.isZero() || timeout.isNegative())) {
             throw new IllegalArgumentException("timeout must be positive");
         }
     }

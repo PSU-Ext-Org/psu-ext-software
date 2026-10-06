@@ -20,6 +20,7 @@ package com.psuext.script.execution.service;
  * #L%
  */
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -178,6 +179,8 @@ public final class DefaultScriptRunnerService implements ScriptRunnerService {
 
     @Override
     public ScriptTaskId start(ScriptStartRequest request) {
+        Duration timeout = request.timeout() != null
+                ? request.timeout() : runtimeProperties.getDefaultTimeout();
 
         ScriptTaskId taskId = ScriptTaskId.random();
         Instant createdAt = Instant.now();
@@ -196,13 +199,13 @@ public final class DefaultScriptRunnerService implements ScriptRunnerService {
                 taskId,
                 request.name(),
                 request.source(),
-                request.timeout(),
+                timeout,
                 createdAt);
 
         taskStore.save(ScriptTaskRecord.from(task.snapshot()));
         tasks.put(taskId, task);
         LOGGER.info("Script task queued: taskId={} name={} timeoutMs={} sourceLength={}",
-                taskId, request.name(), request.timeout().toMillis(), request.source().length());
+                taskId, request.name(), timeout.toMillis(), request.source().length());
 
         try {
             task.setFuture(executor.submit(() -> execute(task, capture, assembler, logWriter)));
@@ -213,7 +216,7 @@ public final class DefaultScriptRunnerService implements ScriptRunnerService {
             throw new ScriptTaskRejectedException();
         }
         scheduler.schedule(() -> timeout(task, assembler, logWriter),
-                request.timeout().toMillis(),
+                timeout.toMillis(),
                 TimeUnit.MILLISECONDS);
 
         return taskId;

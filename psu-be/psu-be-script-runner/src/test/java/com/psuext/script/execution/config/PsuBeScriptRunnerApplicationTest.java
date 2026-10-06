@@ -61,6 +61,7 @@ class PsuBeScriptRunnerApplicationTest {
     void bindsDefaultScriptRuntimeConfiguration() {
         assertThat(storageProperties.getDirectory().getFileName()).hasToString("script-storage");
         assertThat(executionProperties.getMaximumSleep()).isEqualTo(Duration.ofMinutes(5));
+        assertThat(runtimeProperties.getDefaultTimeout()).isEqualTo(Duration.ofHours(1));
         assertThat(runtimeProperties.getMaximumCompletedTasks()).isEqualTo(500);
         assertThat(runtimeProperties.getCompletedTaskRetention()).isEqualTo(Duration.ofHours(1));
         assertThat(executorProperties.getExecutionPoolSize()).isEqualTo(4);
