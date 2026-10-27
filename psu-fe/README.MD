@@ -351,6 +351,14 @@ On the Config page:
 - The Device List widget is a table of backend devices with id, name, type, endpoint, status, per-device auto-connect, and identity.
 - Device auto-connect is managed per backend device row. When the proxy WebSocket opens and `/device-list` loads, the app attempts to connect only the device ids with auto-connect enabled.
 - Device connection and per-device auto-connect are managed directly from the Device List widget.
+- SCPI scheduler `ERR DISCONNECTED` and `ERR CONNECTION_LOST` responses immediately mark the target
+  device offline and discard its pending queries and cached readings, without displaying transport
+  errors in widget values. Other scheduler errors trigger a device status check; there is no periodic
+  status polling. Concurrent errors share one outstanding check for up to ten seconds.
+  Disconnected devices that were connected in this session are
+  retried up to three times, waiting 2, 5, then 15 seconds before the respective attempts
+  (each delay starts after the previous failure or timeout). Each attempt times out after 10 seconds.
+  After three failures the device stays disconnected until manually connected.
 
 The WebSocket monitor can be viewed on the Config page or opened from the top
 header terminal icon. Both views use the same monitor card and shared session

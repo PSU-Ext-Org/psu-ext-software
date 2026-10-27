@@ -13,44 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {
-  ChartCard,
-  ChartCardActions,
-  ChartCardTitle,
-  deleteChartHistory,
-} from "../../../widgets/chart";
-import {
-  ExternalTriggerControlActions,
-  ExternalTriggerControlCard,
-  ExternalTriggerControlTitle,
-} from "../../../widgets/externalTrigger";
-import {
-  ProtectionControlActions,
-  ProtectionControlCard,
-  ProtectionControlTitle,
-} from "../../../widgets/protection";
-import {
-  SingleToggleCard,
-  SingleToggleCardActions,
-  SingleToggleCardTitle,
-} from "../../../widgets/singleToggle";
-import {
-  SingleValueCard,
-  SingleValueCardActions,
-  SingleValueCardTitle,
-} from "../../../widgets/singleValue";
-import {
-  TimerQueueCard,
-  TimerQueueCardActions,
-  TimerQueueCardTitle,
-} from "../../../widgets/timerQueue";
+import { createOperatorWidgetCatalog } from "../operatorWidgetCatalog.js";
+import { deleteChartHistory } from "../../../widgets/chart";
+import { deleteXyChartHistory } from "../../../widgets/xyChart";
 import { deleteStoredWidgetConfig } from "../../../widgets/widgetConfigStore.js";
-import {
-  deleteXyChartHistory,
-  XyChartCard,
-  XyChartCardActions,
-  XyChartCardTitle,
-} from "../../../widgets/xyChart";
 
 /** Configurable dashboard definition for the primary operator workspace. */
 export const operatorDashboard = {
@@ -61,65 +27,7 @@ export const operatorDashboard = {
   layout: {
     defaultLayout: [],
   },
-  widgets: {
-    available: [
-      { type: "singleValue", label: "Single Value", idPrefix: "single-value-dashboard", w: 1, h: 1 },
-      { type: "singleToggle", label: "Single Toggle", idPrefix: "single-toggle-dashboard", w: 1, h: 1 },
-      { type: "protectionControl", label: "Protection Control", idPrefix: "protection-dashboard", w: 1, h: 1 },
-      { type: "externalTriggerControl", label: "External Triggers 1x2", idPrefix: "trigger-dashboard", w: 1, h: 2 },
-      { type: "timerQueueControl", label: "Timer Queue 2x2", idPrefix: "timer-dashboard", w: 2, h: 2 },
-      { type: "chart", label: "Chart 2x1", idPrefix: "chart-dashboard-small", w: 2, h: 1 },
-      { type: "chart", label: "Chart 2x2", idPrefix: "chart-dashboard-medium", w: 2, h: 2 },
-      { type: "chart", label: "Chart 3x2", idPrefix: "chart-dashboard-large", w: 3, h: 2 },
-      { type: "xyChart", label: "XY Chart 2x2", idPrefix: "xy-chart-dashboard-medium", w: 2, h: 2 },
-      { type: "xyChart", label: "XY Chart 3x2", idPrefix: "xy-chart-dashboard-large", w: 3, h: 2 },
-    ],
-    definitions: {
-      chart: {
-        actions: ChartCardActions,
-        render: ChartCard,
-        text: "Live SCPI trend.",
-        title: ChartCardTitle,
-      },
-      xyChart: {
-        actions: XyChartCardActions,
-        render: XyChartCard,
-        text: "SCPI X-Y plot.",
-        title: XyChartCardTitle,
-      },
-      singleValue: {
-        actions: SingleValueCardActions,
-        render: SingleValueCard,
-        text: "SCPI query value.",
-        title: SingleValueCardTitle,
-      },
-      singleToggle: {
-        actions: SingleToggleCardActions,
-        render: SingleToggleCard,
-        text: "SCPI Bin control.",
-        title: SingleToggleCardTitle,
-      },
-      protectionControl: {
-        actions: ProtectionControlActions,
-        render: ProtectionControlCard,
-        text: "Protection controls",
-        title: ProtectionControlTitle,
-      },
-      externalTriggerControl: {
-        actions: ExternalTriggerControlActions,
-        render: ExternalTriggerControlCard,
-        text: "Trigger controls",
-        title: ExternalTriggerControlTitle,
-      },
-      timerQueueControl: {
-        actions: TimerQueueCardActions,
-        render: TimerQueueCard,
-        text: "Queued timer control",
-        title: TimerQueueCardTitle,
-      },
-    },
-    editable: true,
-  },
+  widgets: createOperatorWidgetCatalog("dashboard"),
 };
 
 /**

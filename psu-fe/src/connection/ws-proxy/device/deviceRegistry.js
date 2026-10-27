@@ -16,6 +16,7 @@
 export const EMPTY_DEVICE_STATUS = {
   state: "UNKNOWN",
   error: "",
+  reconnecting: false,
 };
 
 /**

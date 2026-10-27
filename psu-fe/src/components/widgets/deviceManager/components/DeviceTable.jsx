@@ -13,11 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { Settings, Trash2 } from "lucide-react";
-import { useRef, useState } from "react";
+import { DeviceRowActions } from "./DeviceRowActions.jsx";
+import { IdentityCell } from "./IdentityCell.jsx";
+import { formatEndpoint, formatStatus, statusBadgeClass } from "./deviceRowPresentation.js";
 
 /**
  * Renders normalized device rows and their management actions.
+ * Automatic recovery shows a yellow status during attempts and between retries.
  *
  * @param {{manager: object, onDelete: Function, onEdit: Function, rows: object[]}} props
  * @returns {import("react").ReactElement}
@@ -65,7 +67,9 @@ export function DeviceTable({ rows, manager, onEdit, onDelete }) {
                 <IdentityCell status={status} />
               </td>
               <td className="whitespace-nowrap px-3 py-2">
-                <span className={statusBadgeClass(status)}>{status?.state || "DISCONNECTED"}</span>
+                <span className={statusBadgeClass(status)}>
+                  {formatStatus(status)}
+                </span>
               </td>
               <td className="px-3 py-2 text-center">
                 <input
@@ -94,90 +98,4 @@ export function DeviceTable({ rows, manager, onEdit, onDelete }) {
       </table>
     </div>
   );
-}
-
-function DeviceRowActions({ connecting, device, manager, status, onDelete, onEdit }) {
-  const connected = status?.state === "CONNECTED";
-
-  return (
-    <>
-      <button
-        className={connected
-          ? "control-standard w-24 border border-slate-200 bg-white px-3 font-medium text-slate-700 hover:bg-slate-50"
-          : "control-standard w-24 bg-teal-700 px-3 font-medium text-white hover:bg-teal-800 disabled:opacity-50"}
-        disabled={!connected && connecting}
-        onClick={() => Promise.resolve(
-          connected ? manager.disconnectDevice(device.id) : manager.connectDevice(device.id),
-        ).catch(() => {})}
-        type="button"
-      >
-        {connected ? "Disconnect" : connecting ? "Connecting..." : "Connect"}
-      </button>
-      <button
-        aria-label={`Edit device ${device.name}`}
-        className="control-standard border border-slate-200 bg-white p-1.5"
-        onClick={() => onEdit(device)}
-        type="button"
-      >
-        <Settings className="h-3.5 w-3.5" />
-      </button>
-      <button
-        aria-label={`Delete device ${device.name}`}
-        className="control-standard border border-rose-200 bg-white p-1.5 text-rose-700"
-        onClick={() => onDelete(device)}
-        type="button"
-      >
-        <Trash2 className="h-3.5 w-3.5" />
-      </button>
-    </>
-  );
-}
-
-function formatEndpoint(device) {
-  return device.type === "USB"
-    ? `${device.port || "COM?"} @ ${device.baudrate || "baud?"}`
-    : `${device.ip || "host?"}:${device.port || "port?"}`;
-}
-
-function formatIdentity(status) {
-  if (status?.identity?.valid) {
-    return `${status.identity.name} | SN ${status.identity.serialNumber} | FW ${status.identity.firmwareLevel}`;
-  }
-  return status?.identity?.raw || status?.error || "-";
-}
-
-/**
- * Shows the identity text, panning it into view on hover when it overflows the cell.
- *
- * @param {{status: object}} props
- * @returns {import("react").ReactElement}
- */
-function IdentityCell({ status }) {
-  const text = formatIdentity(status);
-  const containerRef = useRef(null);
-  const [shift, setShift] = useState(0);
-
-  const handleEnter = () => {
-    const el = containerRef.current;
-    if (el) {
-      setShift(Math.max(0, el.scrollWidth - el.clientWidth));
-    }
-  };
-
-  return (
-    <div className="overflow-hidden" onMouseEnter={handleEnter} onMouseLeave={() => setShift(0)} ref={containerRef} title={text}>
-      <span
-        className="inline-block whitespace-nowrap ease-linear"
-        style={{ transform: `translateX(-${shift}px)`, transitionDuration: `${Math.max(400, shift * 15)}ms`, transitionProperty: "transform" }}
-      >
-        {text}
-      </span>
-    </div>
-  );
-}
-
-function statusBadgeClass(status) {
-  return `inline-flex rounded px-2 py-0.5 text-xs font-semibold ${status?.state === "CONNECTED"
-    ? "bg-emerald-50 text-emerald-800"
-    : "bg-slate-100 text-slate-600"}`;
 }

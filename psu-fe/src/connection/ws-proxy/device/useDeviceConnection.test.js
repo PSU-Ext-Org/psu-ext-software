@@ -13,38 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { act, renderHook } from "@testing-library/react";
+import { act, cleanup } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { useDeviceConnection } from "./useDeviceConnection.js";
+import { DEVICE_LIST, renderDeviceConnection } from "./deviceConnectionTestFixtures.js";
 
-function renderDeviceConnection(overrides = {}) {
-  let nextRequestId = 0;
-  const options = {
-    sendWsMessage: vi.fn(() => `uuid-${(nextRequestId += 1)}`),
-    appendWsMessage: vi.fn(),
-    ...overrides,
-  };
+beforeEach(() => vi.useFakeTimers());
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+});
 
-  return {
-    options,
-    ...renderHook(() => useDeviceConnection(options)),
-  };
-}
-
-const DEVICE_LIST = [
-  "0,PSU1,TCP,192.168.4.1,5025,",
-  "1,USB1,USB,,COM3,115200",
-].join("\n");
-
-describe("useDeviceConnection", () => {
-  beforeEach(() => {
-    vi.useFakeTimers();
-  });
-
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
+describe("device registry, commands and identity", () => {
   it("requests devices and statuses", () => {
     const { result, options } = renderDeviceConnection();
 

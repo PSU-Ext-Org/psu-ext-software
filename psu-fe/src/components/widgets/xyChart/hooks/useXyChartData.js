@@ -34,7 +34,7 @@ const EMPTY_SNAPSHOTS = Object.freeze({ x: EMPTY_SNAPSHOT, y: EMPTY_SNAPSHOT });
  *
  * Points are stored in `localStorage` per widget, newest last, and pruned to `config.historyLimitBytes` by dropping
  * the oldest points. Stored points are shown again after a reload as long as the X and Y devices and queries are
- * unchanged; points recorded for another device or query are not shown.
+ * unchanged; points recorded for another device or query are not shown. Disconnecting either axis clears history and pairing.
  *
  * @param {object} params
  * @param {string} params.widgetId - Storage key of this chart; also matches `deleteXyChartHistory(widgetId)`.
@@ -83,6 +83,13 @@ export function useXyChartData({ widgetId, config, getScpiQuerySnapshot, subscri
       const read = (seed) => {
         const snapshot = getScpiQuerySnapshot(deviceName, query);
         setSnapshots((current) => ({ ...current, [axis]: snapshot }));
+        if (snapshot.disconnected) {
+          pairer.reset();
+          lastUpdatedAt.x = 0;
+          lastUpdatedAt.y = 0;
+          setPoints(saveXyChartHistory(widgetId, configRef.current, []));
+          return;
+        }
 
         const isNewUpdate = snapshot.updatedAt > lastUpdatedAt[axis];
         lastUpdatedAt[axis] = Math.max(lastUpdatedAt[axis], snapshot.updatedAt);
