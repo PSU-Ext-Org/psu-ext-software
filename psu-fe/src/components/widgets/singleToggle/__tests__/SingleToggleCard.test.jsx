@@ -90,7 +90,7 @@ describe("SingleToggleCard", () => {
     saveConfig("single-toggle-main");
     mockConnection.sendScpiCommand.mockResolvedValueOnce({ ok: true, response: "1" });
 
-    render(<SingleToggleCard placement={{ id: "single-toggle-main" }} />);
+    const { rerender } = render(<SingleToggleCard placement={{ id: "single-toggle-main" }} />);
 
     expect(await screen.findByText("ON")).toBeInTheDocument();
     expect(mockConnection.sendScpiCommand).toHaveBeenCalledWith("OUTP? CH1", "PSU1", {
@@ -101,6 +101,10 @@ describe("SingleToggleCard", () => {
     expect(screen.getByText("ON")).toHaveStyle({
       color: "#0f766e",
     });
+    mockConnection.deviceStatuses = { 0: { state: "DISCONNECTED" } };
+    rerender(<SingleToggleCard placement={{ id: "single-toggle-main" }} />);
+    expect(screen.queryByText("ON")).not.toBeInTheDocument();
+    expect(screen.getByText("--")).toBeInTheDocument();
   });
 
   it("dedupes automatic status checks during StrictMode remount", async () => {

@@ -23,7 +23,7 @@ import {
 import { mergeSeriesPoints, normalizeSnapshotPoints } from "../utils/chartSeriesData.js";
 
 /**
- * Converts SCPI snapshots into renderer-ready time-series data.
+ * Converts SCPI snapshots into renderer-ready time-series data, clearing a series and its saved history on disconnect.
  *
  * @param {object} params
  * @param {object} params.config
@@ -75,6 +75,11 @@ export function useChartSeriesData({ config, getScpiQuerySnapshot, subscribeScpi
         const appendCurrentSnapshot = () => {
           const snapshot = getScpiQuerySnapshot(series.deviceName, series.query);
           setSnapshotsBySeriesId((current) => ({ ...current, [series.id]: snapshot }));
+          if (snapshot.disconnected) {
+            setSeriesData((current) => saveChartHistory(widgetId, config,
+              current.map((row) => row.id === series.id ? { ...row, points: [] } : row)));
+            return;
+          }
           const points = normalizeSnapshotPoints(snapshot);
           if (!points.length) {
             return;

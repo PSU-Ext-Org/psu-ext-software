@@ -103,7 +103,7 @@ export function SingleToggleCard({ placement }) {
     return nextSnapshot;
   }, [config.deviceName, config.statusCommand, getScpiQuerySnapshot]);
   const snapshot = useSyncExternalStore(subscribeSnapshot, getSnapshot, getSnapshot);
-  const displayText = status.state === "on" ? "ON" : status.state === "off" ? "OFF" : "--";
+  const displayText = !runnable ? "--" : status.state === "on" ? "ON" : status.state === "off" ? "OFF" : "--";
   const helperText = getHelperText({
     autoRefreshEnabled: config.autoRefreshEnabled,
     device,
@@ -114,7 +114,7 @@ export function SingleToggleCard({ placement }) {
     wsConnected,
   });
   const actionLabel =
-    status.state === "on" ? "Turn off" : status.state === "off" ? "Turn on" : "Check";
+    !runnable ? "Check" : status.state === "on" ? "Turn off" : status.state === "off" ? "Turn on" : "Check";
   const actionDisabled = !runnable || status.busy;
 
   const checkStatus = useCallback(
@@ -140,7 +140,7 @@ export function SingleToggleCard({ placement }) {
             message: nextState === "unknown" ? `Unexpected response: ${result.response}` : "Ready",
           });
         }
-        return nextState;
+        return requestSequenceRef.current === sequence ? nextState : "unknown";
       } catch (error) {
         if (requestSequenceRef.current === sequence) {
           setStatus({
@@ -159,7 +159,7 @@ export function SingleToggleCard({ placement }) {
     requestSequenceRef.current += 1;
     if (!runnable) {
       setStatus(INITIAL_TOGGLE_STATUS);
-      return undefined;
+      return void pendingAutoStatusChecks.delete(createAutoStatusKey(placement.id, config));
     }
 
     checkStatus({
@@ -173,7 +173,7 @@ export function SingleToggleCard({ placement }) {
   }, [checkStatus, config, placement.id, runnable]);
 
   useEffect(() => {
-    if (!config.autoRefreshEnabled || status.busy || !snapshot.updatedAt) {
+    if (!runnable || !config.autoRefreshEnabled || status.busy || !snapshot.updatedAt) {
       return;
     }
 
@@ -194,7 +194,7 @@ export function SingleToggleCard({ placement }) {
         message: nextMessage,
       };
     });
-  }, [config, snapshot.updatedAt, snapshot.value, status.busy]);
+  }, [config, runnable, snapshot.updatedAt, snapshot.value, status.busy]);
 
   if (!config.deviceName || !config.statusCommand || !config.onCommand || !config.offCommand) {
     return (
@@ -270,7 +270,7 @@ export function SingleToggleCard({ placement }) {
         config.deviceName,
         targetState === "on" ? config.onCommand : config.offCommand,
       );
-      const verifiedState = await checkStatus({ busy: true, message: "Verifying status" });
+      const verifiedState = requestSequenceRef.current === sequence ? await checkStatus({ busy: true, message: "Verifying status" }) : "unknown";
       if (verifiedState !== targetState && requestSequenceRef.current === sequence + 1) {
         setStatus({
           state: verifiedState,

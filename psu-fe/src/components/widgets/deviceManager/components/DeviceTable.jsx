@@ -18,6 +18,7 @@ import { useRef, useState } from "react";
 
 /**
  * Renders normalized device rows and their management actions.
+ * Automatic recovery shows a yellow status during attempts and between retries.
  *
  * @param {{manager: object, onDelete: Function, onEdit: Function, rows: object[]}} props
  * @returns {import("react").ReactElement}
@@ -65,7 +66,9 @@ export function DeviceTable({ rows, manager, onEdit, onDelete }) {
                 <IdentityCell status={status} />
               </td>
               <td className="whitespace-nowrap px-3 py-2">
-                <span className={statusBadgeClass(status)}>{status?.state || "DISCONNECTED"}</span>
+                <span className={statusBadgeClass(status)}>
+                  {status?.reconnecting ? "Reconnecting" : status?.state || "DISCONNECTED"}
+                </span>
               </td>
               <td className="px-3 py-2 text-center">
                 <input
@@ -98,20 +101,23 @@ export function DeviceTable({ rows, manager, onEdit, onDelete }) {
 
 function DeviceRowActions({ connecting, device, manager, status, onDelete, onEdit }) {
   const connected = status?.state === "CONNECTED";
+  const reconnecting = Boolean(status?.reconnecting);
 
   return (
     <>
       <button
-        className={connected
+        className={reconnecting
+          ? "control-standard w-24 bg-red-700 px-3 font-medium text-white hover:bg-red-800"
+          : connected
           ? "control-standard w-24 border border-slate-200 bg-white px-3 font-medium text-slate-700 hover:bg-slate-50"
           : "control-standard w-24 bg-teal-700 px-3 font-medium text-white hover:bg-teal-800 disabled:opacity-50"}
-        disabled={!connected && connecting}
+        disabled={!reconnecting && !connected && connecting}
         onClick={() => Promise.resolve(
-          connected ? manager.disconnectDevice(device.id) : manager.connectDevice(device.id),
+          connected || reconnecting ? manager.disconnectDevice(device.id) : manager.connectDevice(device.id),
         ).catch(() => {})}
         type="button"
       >
-        {connected ? "Disconnect" : connecting ? "Connecting..." : "Connect"}
+        {reconnecting ? "Cancel" : connected ? "Disconnect" : connecting ? "Connecting..." : "Connect"}
       </button>
       <button
         aria-label={`Edit device ${device.name}`}
@@ -177,6 +183,9 @@ function IdentityCell({ status }) {
 }
 
 function statusBadgeClass(status) {
+  if (status?.reconnecting) {
+    return "inline-flex rounded px-2 py-0.5 text-xs font-semibold bg-yellow-100 text-yellow-800";
+  }
   return `inline-flex rounded px-2 py-0.5 text-xs font-semibold ${status?.state === "CONNECTED"
     ? "bg-emerald-50 text-emerald-800"
     : "bg-slate-100 text-slate-600"}`;

@@ -95,6 +95,23 @@ describe("useXyChartData", () => {
     }
   }
 
+  it("clears history and pending pairs on disconnect and starts with fresh samples", () => {
+    const { result } = renderData();
+    publishPairs(2);
+    expect(result.current.points).toHaveLength(2);
+    scheduler.publish(X_QUERY, { value: "9", updatedAt: 30 });
+    scheduler.publish(Y_QUERY, { value: "", updatedAt: 0, disconnected: true });
+    act(() => vi.advanceTimersByTime(2000));
+    expect(result.current.points).toEqual([]);
+    expect(loadXyChartHistory("xy-test", createConfig())).toEqual([]);
+    scheduler.publish(Y_QUERY, { value: "4", updatedAt: 40 });
+    act(() => vi.advanceTimersByTime(2000));
+    expect(result.current.points).toEqual([]);
+    scheduler.publish(X_QUERY, { value: "3", updatedAt: 50 });
+    scheduler.publish(Y_QUERY, { value: "6", updatedAt: 51 });
+    expect(result.current.points).toEqual([{ x: 3, y: 6, t: 51 }]);
+  });
+
   it("pairs a fresh X and Y update into one point", () => {
     const { result } = renderData();
 

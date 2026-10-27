@@ -38,6 +38,7 @@ export function ExternalTriggerControlActions({ placement }) {
   return <ExternalTriggerSettings iconOnly placement={placement} />;
 }
 
+/** Displays trigger assignments only while the device connection is available. */
 export function ExternalTriggerControlCard({ placement }) {
   const {
     wsConnected,
@@ -111,8 +112,8 @@ export function ExternalTriggerControlCard({ placement }) {
                 <div className="grid grid-cols-[minmax(0,0.9fr)_minmax(8rem,1.1fr)] items-center gap-2" key={slot.key}>
                   <div className="min-w-0">
                     <p className="text-xs font-medium text-slate-600">{slot.label}</p>
-                    <p className="truncate text-[11px] text-slate-500" title={slotDisplay.commandLabel}>
-                      {slotDisplay.commandLabel}
+                    <p className="truncate text-[11px] text-slate-500" title={runnable ? slotDisplay.commandLabel : ""}>
+                      {runnable ? slotDisplay.commandLabel : "--"}
                     </p>
                   </div>
                   <select
@@ -125,8 +126,9 @@ export function ExternalTriggerControlCard({ placement }) {
                         [slot.key]: event.target.value,
                       }));
                     }}
-                    value={slotDisplay.selectValue}
+                    value={runnable ? slotDisplay.selectValue : ""}
                   >
+                    {!runnable ? <option value="">--</option> : null}
                     {selectOptions.map((option) => (
                       <option key={`${slot.key}-${option.value}`} value={option.value}>
                         {option.label}

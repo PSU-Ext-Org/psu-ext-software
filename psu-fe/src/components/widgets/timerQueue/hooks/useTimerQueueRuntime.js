@@ -177,9 +177,9 @@ export function useTimerQueueRuntime({ config, device, runnable, sendScpiCommand
   }, [config, displayedRemainingMs, runnable, runtime, sendScpiCommand]);
 
   return {
-    runtime,
-    displayedRemainingMs,
-    progressPercent,
+    runtime: runnable ? runtime : INITIAL_TIMER_QUEUE_RUNTIME,
+    displayedRemainingMs: runnable ? displayedRemainingMs : 0,
+    progressPercent: runnable ? progressPercent : null,
     refreshStatus,
     handleTimerAction,
   };

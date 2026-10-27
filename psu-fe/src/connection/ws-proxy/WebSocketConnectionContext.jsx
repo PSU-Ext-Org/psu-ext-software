@@ -64,6 +64,7 @@ export function WebSocketConnectionProvider({ children }) {
   });
   const deviceIdentity = useDeviceIdentity({ sendWsMessage: wsSession.sendWsMessage });
   const deviceConnection = useDeviceConnection({
+    wsConnected: wsSession.wsConnected,
     sendWsMessage: wsSession.sendWsMessage,
     appendWsMessage: monitor.appendWsMessage,
   });
@@ -72,9 +73,13 @@ export function WebSocketConnectionProvider({ children }) {
     onRefresh: () => deviceConnection.requestDevicesAndStatuses(),
   });
   const scpiScheduler = useScpiQueryScheduler({
+    onScpiError: deviceConnection.checkDeviceStatusAfterError,
     sendWsMessage: wsSession.sendWsMessage,
     wsConnectedRef: wsSession.wsConnectedRef,
-    getDeviceState: () => deviceStateRef.current,
+    getDeviceState: () => ({
+      ...deviceStateRef.current,
+      deviceStatuses: deviceConnection.deviceStatusesRef.current,
+    }),
   });
 
   useEffect(() => {

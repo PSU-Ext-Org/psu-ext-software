@@ -94,13 +94,17 @@ describe("ExternalTriggerControlCard", () => {
       .mockResolvedValueOnce({ ok: true, response: "OUT_OFF,CH1" })
       .mockResolvedValueOnce({ ok: true, response: "OUT_TOGGLE,CH1" });
 
-    render(<ExternalTriggerControlCard placement={{ id: "trigger-main" }} />);
+    const { rerender } = render(<ExternalTriggerControlCard placement={{ id: "trigger-main" }} />);
 
     await waitFor(() => expect(screen.getByLabelText("T1 LOW action")).toHaveValue("OUT_ON,CH1"));
     expect(screen.getByLabelText("T1 HIGH action")).toHaveValue("NONE");
     expect(screen.getByLabelText("T2 LOW action")).toHaveValue("OUT_OFF,CH1");
     expect(screen.getByLabelText("T2 HIGH action")).toHaveValue("OUT_TOGGLE,CH1");
     expect(screen.getByText("PSU1")).toBeInTheDocument();
+    mockConnection.deviceStatuses = { 0: { state: "DISCONNECTED" } };
+    rerender(<ExternalTriggerControlCard placement={{ id: "trigger-main" }} />);
+    expect(screen.getByLabelText("T1 LOW action")).toHaveValue("");
+    expect(screen.getByLabelText("T1 LOW action")).toBeDisabled();
   });
 
   it("shows an unmapped payload safely", async () => {

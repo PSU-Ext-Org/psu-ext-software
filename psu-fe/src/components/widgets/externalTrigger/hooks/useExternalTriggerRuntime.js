@@ -25,6 +25,7 @@ import {
   sendExternalTriggerCommand,
 } from "../utils/triggerRuntime.js";
 
+/** Clears device-derived trigger state and invalidates pending reads when the connection becomes unavailable. */
 export function useExternalTriggerRuntime({
   config,
   runnable,
@@ -53,6 +54,7 @@ export function useExternalTriggerRuntime({
     config.deviceName,
     config.setupCommandTemplate,
     config.statusQueryTemplate,
+    runnable,
   ]);
 
   const refreshRuntime = useCallback(async () => {
@@ -114,7 +116,7 @@ export function useExternalTriggerRuntime({
       return undefined;
     }
 
-    void refreshRuntime();
+    void refreshRuntime().catch(() => {});
     return undefined;
   }, [refreshRuntime, runnable]);
 
@@ -123,9 +125,11 @@ export function useExternalTriggerRuntime({
       return;
     }
 
+    const requestVersion = requestVersionRef.current;
     setRuntime((current) => ({ ...current, loading: true, error: "" }));
     try {
       for (const slot of TRIGGER_SLOT_DEFINITIONS) {
+        if (!mountedRef.current || requestVersionRef.current !== requestVersion) return;
         if (!Object.hasOwn(nextSlots, slot.key)) {
           continue;
         }
@@ -136,8 +140,10 @@ export function useExternalTriggerRuntime({
           interpolateSetupCommand(config.setupCommandTemplate, slot, nextSlots[slot.key]),
         );
       }
+      if (!mountedRef.current || requestVersionRef.current !== requestVersion) return;
       await refreshRuntime();
     } catch (error) {
+      if (!mountedRef.current || requestVersionRef.current !== requestVersion) return;
       setRuntime((current) => ({
         ...current,
         loading: false,
@@ -147,7 +153,7 @@ export function useExternalTriggerRuntime({
   }, [config, refreshRuntime, runnable, sendScpiCommand]);
 
   return {
-    runtime,
+    runtime: runnable ? runtime : INITIAL_TRIGGER_RUNTIME_STATE,
     refreshRuntime,
     saveSlots,
   };

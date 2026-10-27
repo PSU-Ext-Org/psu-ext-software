@@ -13,7 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { clearDeviceScpiHistory } from "../../../components/widgets/widgetScpiHistory.js";
 import { isConnectionLifecycleMessage, parseDeviceIdentity } from "../identity/deviceIdentity.js";
 import {
   EMPTY_DEVICE_STATUS,
@@ -23,17 +24,21 @@ import {
 } from "./deviceRegistry.js";
 
 const CONNECTION_TIMEOUT_MS = 10_000;
+const RECOVERY_DELAYS_MS = [2000, 5000, 15000];
 
 /**
  * Owns proxy device registry and per-device connection state.
+ * Statuses expose `reconnecting` throughout automatic recovery, including retry delays.
  *
  * @param {object} options
+ * @param {boolean} options.wsConnected - Enables error-triggered status checks and disconnect recovery.
  * @param {(message: string) => string | null} options.sendWsMessage
  * @param {(direction: string, message: string) => void} options.appendWsMessage
  * @returns {{
  *   devices: {id: string, name: string, type: string, ip: string, port: string, baudrate: string}[],
  *   deviceByNameRef: import("react").MutableRefObject<Map<string, {id: string, name: string, type: string, ip: string, port: string, baudrate: string}>>,
  *   deviceStatuses: Record<string, typeof EMPTY_DEVICE_STATUS>,
+ *   deviceStatusesRef: import("react").MutableRefObject<Record<string, typeof EMPTY_DEVICE_STATUS>>,
  *   deviceConnected: boolean,
  *   deviceConnectedRef: import("react").MutableRefObject<boolean>,
  *   deviceConnecting: boolean,
@@ -43,14 +48,21 @@ const CONNECTION_TIMEOUT_MS = 10_000;
  *   connectConfiguredDevices: (ids: string[]) => void,
  *   disconnectDevice: (id: string) => void,
  *   requestDevicesAndStatuses: (options?: {autoConnectDeviceIds?: string[]}) => void,
+ *   checkDeviceStatusAfterError: (deviceName?: string, error?: string) => boolean,
  *   updateDeviceStateFromMessage: (message: string, uuid?: string) => void,
  *   resetDeviceState: () => void,
  *   clearDeviceConnectTimeout: () => void,
  *   updateDeviceConnected: (value: boolean) => void
  * }}
  */
-export function useDeviceConnection({ sendWsMessage, appendWsMessage }) {
-  const deviceConnectTimeoutRef = useRef(null);
+export function useDeviceConnection({ sendWsMessage, appendWsMessage, wsConnected = false }) {
+  const recoveryIdsRef = useRef(new Set());
+  const recoveryAttemptsRef = useRef(new Map());
+  const recoveryTimersRef = useRef(new Map());
+  const manuallyDisconnectedIdsRef = useRef(new Set());
+  const retryConnectionsRef = useRef(null);
+  const pendingStatusRef = useRef(null);
+  const deviceConnectTimeoutRef = useRef(new Map());
   const pendingConnectIdsRef = useRef([]);
   const pendingConnectByUuidRef = useRef(new Map());
   const pendingDisconnectByUuidRef = useRef(new Map());
@@ -67,6 +79,53 @@ export function useDeviceConnection({ sendWsMessage, appendWsMessage }) {
   const [deviceStatuses, setDeviceStatuses] = useState({});
   const [deviceConnecting, setDeviceConnecting] = useState(false);
   const [deviceConnectingIds, setDeviceConnectingIds] = useState([]);
+
+  retryConnectionsRef.current = (id) => {
+    recoveryTimersRef.current.delete(id);
+    if (!recoveryIdsRef.current.has(id) || deviceStatusesRef.current[id]?.state !== "DISCONNECTED") return;
+    recoveryAttemptsRef.current.set(id, (recoveryAttemptsRef.current.get(id) || 0) + 1);
+    connectDevice(id);
+  };
+
+  useEffect(() => {
+    for (const [id, timer] of recoveryTimersRef.current) {
+      if (!wsConnected || !deviceStatuses[id]?.reconnecting || deviceStatuses[id]?.state !== "DISCONNECTED") {
+        window.clearTimeout(timer);
+        recoveryTimersRef.current.delete(id);
+      }
+    }
+    if (!wsConnected) return;
+    for (const [id, status] of Object.entries(deviceStatuses)) {
+      if (status.reconnecting && status.state === "DISCONNECTED" && !recoveryTimersRef.current.has(id)) {
+        const delay = RECOVERY_DELAYS_MS[recoveryAttemptsRef.current.get(id) || 0];
+        recoveryTimersRef.current.set(id, window.setTimeout(() => retryConnectionsRef.current(id), delay));
+      }
+    }
+  }, [wsConnected, deviceStatuses]);
+
+  useEffect(() => () => {
+    clearDeviceConnectTimeout();
+    for (const timer of recoveryTimersRef.current.values()) window.clearTimeout(timer);
+    recoveryTimersRef.current.clear();
+  }, []);
+
+  function checkDeviceStatusAfterError(deviceName, error = "") {
+    if (!wsConnected) return false;
+    const device = deviceByNameRef.current.get(deviceName);
+    if (device && /^ERR (DISCONNECTED|CONNECTION_LOST)(?:\s|$)/.test(error.trim())) {
+      if (deviceStatusesRef.current[device.id]?.state === "CONNECTED") {
+        setDeviceStatus(device.id, { state: "DISCONNECTED", error });
+        appendWsMessage("system", `Device ${device.name} disconnected: ${error}`);
+      }
+      return true;
+    }
+    const pending = pendingStatusRef.current;
+    if (!pending || Date.now() - pending.sentAt >= CONNECTION_TIMEOUT_MS) {
+      const uuid = sendWsMessage("/status");
+      pendingStatusRef.current = uuid ? { uuid, sentAt: Date.now() } : null;
+    }
+    return false;
+  }
 
   function requestDevicesAndStatuses({ autoConnectDeviceIds = [] } = {}) {
     autoConnectDeviceIdsAfterDeviceListRef.current = Array.isArray(autoConnectDeviceIds)
@@ -86,6 +145,7 @@ export function useDeviceConnection({ sendWsMessage, appendWsMessage }) {
     }
 
     beginConnect(id);
+    manuallyDisconnectedIdsRef.current.delete(String(id));
     const uuid = sendWsMessage(`/connect ${device.name}`);
     if (!uuid) {
       finishConnect(id, false, "Cannot send connect command");
@@ -117,16 +177,24 @@ export function useDeviceConnection({ sendWsMessage, appendWsMessage }) {
       return;
     }
 
+    const wasConnected = deviceStatusesRef.current[id]?.state === "CONNECTED";
+    recoveryIdsRef.current.delete(String(id));
+    recoveryAttemptsRef.current.delete(String(id));
+    manuallyDisconnectedIdsRef.current.add(String(id));
+    finishConnect(String(id), false);
     setDeviceStatus(id, { state: "DISCONNECTING", error: "" });
     const uuid = sendWsMessage(`/disconnect ${device.name}`);
     if (!uuid) {
-      setDeviceStatus(id, { state: "CONNECTED", error: "Cannot send disconnect command" });
+      setDeviceStatus(id, {
+        state: wasConnected ? "CONNECTED" : "DISCONNECTED", error: "Cannot send disconnect command",
+      });
       return;
     }
     pendingDisconnectByUuidRef.current.set(uuid, String(id));
   }
 
   function updateDeviceStateFromMessage(message, uuid = "") {
+    if (pendingStatusRef.current?.uuid === uuid) pendingStatusRef.current = null;
     const isDeviceListResponse = pendingDeviceListUuidsRef.current.delete(uuid);
     const parsedDevices = parseDeviceList(message);
     if (parsedDevices.length || isDeviceListResponse) {
@@ -206,6 +274,13 @@ export function useDeviceConnection({ sendWsMessage, appendWsMessage }) {
   }
 
   function resetDeviceState() {
+    for (const device of devicesRef.current) clearDeviceScpiHistory(device.name);
+    recoveryIdsRef.current.clear();
+    recoveryAttemptsRef.current.clear();
+    for (const timer of recoveryTimersRef.current.values()) window.clearTimeout(timer);
+    recoveryTimersRef.current.clear();
+    manuallyDisconnectedIdsRef.current.clear();
+    pendingStatusRef.current = null;
     clearDeviceConnectTimeout();
     devicesRef.current = [];
     deviceByIdRef.current = new Map();
@@ -226,10 +301,8 @@ export function useDeviceConnection({ sendWsMessage, appendWsMessage }) {
   }
 
   function clearDeviceConnectTimeout() {
-    if (deviceConnectTimeoutRef.current) {
-      window.clearTimeout(deviceConnectTimeoutRef.current);
-      deviceConnectTimeoutRef.current = null;
-    }
+    for (const timer of deviceConnectTimeoutRef.current.values()) window.clearTimeout(timer);
+    deviceConnectTimeoutRef.current.clear();
   }
 
   function updateDeviceConnected(value) {
@@ -240,21 +313,17 @@ export function useDeviceConnection({ sendWsMessage, appendWsMessage }) {
     pendingConnectIdsRef.current = [...pendingConnectIdsRef.current, id];
     setDeviceStatus(id, { state: "CONNECTING", error: "" });
     updateConnectingState();
-    clearDeviceConnectTimeout();
-    deviceConnectTimeoutRef.current = window.setTimeout(() => {
-      for (const pendingId of pendingConnectIdsRef.current) {
-        setDeviceStatus(pendingId, {
-          state: "DISCONNECTED",
-          error: `Device connect timed out after 10 seconds: ${pendingId}`,
-        });
-      }
-      pendingConnectIdsRef.current = [];
-      pendingConnectByUuidRef.current.clear();
-      updateConnectingState();
-    }, CONNECTION_TIMEOUT_MS);
+    deviceConnectTimeoutRef.current.set(id, window.setTimeout(() => {
+      finishConnect(id, false, `Device connect timed out after 10 seconds: ${id}`);
+    }, CONNECTION_TIMEOUT_MS));
   }
 
   function finishConnect(id, connected, error = "") {
+    window.clearTimeout(deviceConnectTimeoutRef.current.get(id));
+    deviceConnectTimeoutRef.current.delete(id);
+    for (const [uuid, pendingId] of pendingConnectByUuidRef.current) {
+      if (pendingId === id) pendingConnectByUuidRef.current.delete(uuid);
+    }
     pendingConnectIdsRef.current = pendingConnectIdsRef.current.filter(
       (pendingId) => pendingId !== id,
     );
@@ -268,6 +337,7 @@ export function useDeviceConnection({ sendWsMessage, appendWsMessage }) {
   }
 
   function applyStatusUpdate(status) {
+    if (status.state === "CONNECTED" && manuallyDisconnectedIdsRef.current.has(String(status.id))) return;
     if (isConnecting(status.id) && status.state !== "CONNECTED") {
       setDeviceStatus(status.id, {
         ...status,
@@ -282,6 +352,33 @@ export function useDeviceConnection({ sendWsMessage, appendWsMessage }) {
   }
 
   function setDeviceStatus(id, patch) {
+    if (patch.state && patch.state !== "CONNECTED" && deviceStatusesRef.current[id]?.state === "CONNECTED") {
+      const device = findDevice(id);
+      if (device) clearDeviceScpiHistory(device.name);
+    }
+    if (patch.state === "CONNECTED" && !manuallyDisconnectedIdsRef.current.has(String(id))) {
+      recoveryIdsRef.current.add(String(id));
+      recoveryAttemptsRef.current.delete(String(id));
+    }
+    if (patch.state === "DISCONNECTED" && recoveryAttemptsRef.current.get(String(id)) >= RECOVERY_DELAYS_MS.length) {
+      recoveryIdsRef.current.delete(String(id));
+    }
+    if (patch.state) {
+      patch = {
+        ...patch,
+        reconnecting: recoveryIdsRef.current.has(String(id))
+          && ["DISCONNECTED", "CONNECTING"].includes(patch.state),
+      };
+    }
+    if (patch.state && patch.state !== "CONNECTED") {
+      patch = { ...patch, identity: null };
+      identityRequestedIdsRef.current = identityRequestedIdsRef.current.filter(
+        (requestedId) => requestedId !== String(id),
+      );
+      for (const [uuid, pendingId] of pendingIdentityByUuidRef.current) {
+        if (pendingId === String(id)) pendingIdentityByUuidRef.current.delete(uuid);
+      }
+    }
     const next = {
       ...deviceStatusesRef.current,
       [id]: {
@@ -316,7 +413,8 @@ export function useDeviceConnection({ sendWsMessage, appendWsMessage }) {
   function requestDeviceIdentity(id) {
     const device = findDevice(id);
     const deviceId = String(id);
-    if (!device || identityRequestedIdsRef.current.includes(deviceId)) {
+    if (!device || deviceStatusesRef.current[deviceId]?.state !== "CONNECTED"
+      || identityRequestedIdsRef.current.includes(deviceId)) {
       return;
     }
 
@@ -346,6 +444,7 @@ export function useDeviceConnection({ sendWsMessage, appendWsMessage }) {
     devices,
     deviceByNameRef,
     deviceStatuses,
+    deviceStatusesRef,
     deviceConnected: countConnectedDevices(deviceStatuses) > 0,
     deviceConnectedRef,
     deviceConnecting,
@@ -357,6 +456,7 @@ export function useDeviceConnection({ sendWsMessage, appendWsMessage }) {
     connectAllTcpDevices: connectAllDevices,
     disconnectDevice,
     requestDevicesAndStatuses,
+    checkDeviceStatusAfterError,
     updateDeviceStateFromMessage,
     resetDeviceState,
     clearDeviceConnectTimeout,

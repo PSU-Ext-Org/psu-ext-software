@@ -281,6 +281,14 @@ describe("ChartCard", () => {
     expect(JSON.parse(window.localStorage.getItem(CHART_HISTORY_STORAGE_KEY))).toHaveProperty(
       "chart-home-main",
     );
+    snapshot = { value: "", updatedAt: 0, loading: false, error: "", disconnected: true };
+    act(() => snapshotListener());
+    expect(screen.getByText("Waiting for numeric samples.")).toBeInTheDocument();
+    expect(initialInstance.destroy).toHaveBeenCalled();
+    expect(JSON.parse(window.localStorage.getItem(CHART_HISTORY_STORAGE_KEY))["chart-home-main"]).toBeUndefined();
+    snapshot = { value: "5", updatedAt: 3000, loading: false, error: "" };
+    act(() => snapshotListener());
+    await waitFor(() => expect(mockUplot.instances.at(-1).data).toEqual([[3], [5]]));
   });
 
   it("merges overlapping binary DATA intervals without duplicate readings", async () => {

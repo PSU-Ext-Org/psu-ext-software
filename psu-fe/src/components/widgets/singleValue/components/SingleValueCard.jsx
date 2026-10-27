@@ -111,7 +111,7 @@ export function SingleValueCard({ placement }) {
           data-testid={`single-value-${placement.id}`}
           style={{ color: config.valueColor }}
         >
-          {snapshot.value || "--"}
+          {wsConnected && deviceConnected ? snapshot.value || "--" : "--"}
         </p>
         <p className="mt-1 truncate text-sm font-medium text-slate-600">{config.unit || "\u00a0"}</p>
       </div>

@@ -17,11 +17,12 @@ import { act, cleanup, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useScpiQueryScheduler } from "./useScpiQueryScheduler.js";
 
-function Probe({ api, sendWsMessage, wsConnectedRef, deviceState }) {
+function Probe({ api, sendWsMessage, wsConnectedRef, deviceState, onScpiError }) {
   api.current = useScpiQueryScheduler({
     sendWsMessage,
     wsConnectedRef,
     getDeviceState: () => deviceState.current,
+    onScpiError,
   });
 
   return null;
@@ -80,6 +81,48 @@ describe("useScpiQueryScheduler", () => {
 
     expect(sendWsMessage).toHaveBeenCalledTimes(1);
     expect(sendWsMessage).toHaveBeenCalledWith("CMD PSU1 MEAS:VOLT? CH1", "SCHEDULER");
+  });
+
+  it.each(["device", "proxy"])("discards stale requests and readings after %s disconnect", (target) => {
+    render(<Probe api={api} deviceState={deviceState} sendWsMessage={sendWsMessage}
+      wsConnectedRef={wsConnectedRef} />);
+    act(() => {
+      api.current.subscribeScpiQuery({ widgetId: "voltage", deviceName: "PSU1",
+        query: "MEAS:VOLT?", frequencyHz: 1 });
+      if (target === "device") deviceState.current.deviceStatuses[0].state = "DISCONNECTED";
+      else wsConnectedRef.current = false;
+      api.current.pollScpiQueries();
+    });
+    expect(api.current.getScpiQuerySnapshot("PSU1", "MEAS:VOLT?")).toMatchObject({
+      value: "", loading: false, updatedAt: 0, disconnected: true,
+    });
+    act(() => {
+      deviceState.current.deviceStatuses[0].state = "CONNECTED";
+      wsConnectedRef.current = true;
+      api.current.pollScpiQueries();
+      expect(api.current.handleScpiSchedulerMessage({ uuid: "uuid-1", payload: "99" })).toBe(false);
+      api.current.handleScpiSchedulerMessage({ uuid: "uuid-2", payload: "12" });
+    });
+    expect(sendWsMessage).toHaveBeenCalledTimes(2);
+    expect(api.current.getScpiQuerySnapshot("PSU1", "MEAS:VOLT?").value).toBe("12");
+  });
+
+  it("reports scheduler errors for the target device without triggering on successful or unrelated responses", () => {
+    const onScpiError = vi.fn();
+    render(<Probe api={api} deviceState={deviceState} sendWsMessage={sendWsMessage}
+      wsConnectedRef={wsConnectedRef} onScpiError={onScpiError} />);
+    act(() => {
+      api.current.subscribeScpiQuery({ widgetId: "voltage", deviceName: "PSU1",
+        query: "MEAS:VOLT?", frequencyHz: 1 });
+      api.current.handleScpiSchedulerMessage({ uuid: "uuid-1", payload: "12" });
+      api.current.handleScpiSchedulerMessage({ uuid: "unrelated", payload: "ERR DISCONNECTED" });
+    });
+    expect(onScpiError).not.toHaveBeenCalled();
+    act(() => {
+      vi.advanceTimersByTime(1000);
+      api.current.handleScpiSchedulerMessage({ uuid: "uuid-2", payload: "ERR CONNECTION_LOST USB removed" });
+    });
+    expect(onScpiError).toHaveBeenCalledExactlyOnceWith("PSU1", "ERR CONNECTION_LOST USB removed");
   });
 
   it("uses the fastest requested frequency for shared polling", () => {

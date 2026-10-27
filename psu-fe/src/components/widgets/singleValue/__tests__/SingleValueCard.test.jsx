@@ -104,7 +104,7 @@ describe("SingleValueCard", () => {
     });
     saveConfig("single-value-home-main", "MEAS:VOLT? CH1", "Voltage");
 
-    render(<SingleValueCard placement={{ id: "single-value-home-main" }} />);
+    const { rerender } = render(<SingleValueCard placement={{ id: "single-value-home-main" }} />);
     expect(screen.getByTestId("single-value-single-value-home-main")).toHaveTextContent("12.04");
 
     snapshot = {
@@ -119,6 +119,9 @@ describe("SingleValueCard", () => {
 
     expect(screen.getByTestId("single-value-single-value-home-main")).toHaveTextContent("12.15");
     expect(setIntervalSpy).not.toHaveBeenCalled();
+    mockConnection.deviceStatuses = { 0: { state: "DISCONNECTED" } };
+    rerender(<SingleValueCard placement={{ id: "single-value-home-main" }} />);
+    expect(screen.getByTestId("single-value-single-value-home-main")).toHaveTextContent("--");
   });
 
   it("saves settings under the placement id", () => {

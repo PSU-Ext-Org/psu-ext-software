@@ -112,12 +112,16 @@ describe("ProtectionControlCard", () => {
       .mockResolvedValueOnce({ ok: true, response: "25.0000" })
       .mockResolvedValueOnce({ ok: true, response: "0" });
 
-    render(<ProtectionControlCard placement={{ id: "protection-main" }} />);
+    const { rerender } = render(<ProtectionControlCard placement={{ id: "protection-main" }} />);
 
     expect(await screen.findByText("25.0000")).toBeInTheDocument();
     expect(screen.getByTestId("protection-value-protection-main")).toHaveStyle({ color: "#0f766e" });
     expect(screen.queryByRole("button", { name: "Enable" })).not.toBeInTheDocument();
     expect(screen.getByText("Always on")).toBeInTheDocument();
+    mockConnection.deviceStatuses = { 0: { state: "DISCONNECTED" } };
+    rerender(<ProtectionControlCard placement={{ id: "protection-main" }} />);
+    expect(screen.queryByText("25.0000")).not.toBeInTheDocument();
+    expect(screen.getByTestId("protection-value-protection-main")).toHaveTextContent("--");
   });
 
   it("supports configurable enable state and threshold updates", async () => {

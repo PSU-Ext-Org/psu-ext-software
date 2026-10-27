@@ -27,6 +27,7 @@ import {
   sendProtectionCommand,
 } from "../utils/protectionRuntime.js";
 
+/** Keeps device readings scoped to the current connection and ignores responses from an earlier connection. */
 export function useProtectionRuntime({
   config,
   placementId,
@@ -70,6 +71,7 @@ export function useProtectionRuntime({
     config.tripQuery,
     config.valueSetTemplate,
     config.valueQuery,
+    runnable,
   ]);
 
   const refreshRuntime = useCallback(async (source) => {
@@ -143,9 +145,10 @@ export function useProtectionRuntime({
       return pollPromiseRef.current || fullRefreshPromiseRef.current;
     }
 
+    const requestVersion = requestVersionRef.current;
     const nextPoll = readTripStateSnapshot(config, sendScpiCommand)
       .then((snapshot) => {
-        if (!mountedRef.current) {
+        if (!mountedRef.current || requestVersionRef.current !== requestVersion) {
           return snapshot;
         }
 
@@ -170,7 +173,7 @@ export function useProtectionRuntime({
         return snapshot;
       })
       .catch((error) => {
-        if (!mountedRef.current) {
+        if (!mountedRef.current || requestVersionRef.current !== requestVersion) {
           throw error;
         }
 
@@ -196,9 +199,9 @@ export function useProtectionRuntime({
       return undefined;
     }
 
-    void refreshRuntime("mount");
+    void refreshRuntime("mount").catch(() => {});
     const intervalId = window.setInterval(() => {
-      void pollTripState();
+      void pollTripState().catch(() => {});
     }, Math.max(10, Math.round(1000 / config.frequencyHz)));
 
     return () => window.clearInterval(intervalId);
@@ -211,6 +214,7 @@ export function useProtectionRuntime({
     }
 
     const normalizedValue = formatConfiguredValue(draftValue, config.decimals);
+    const requestVersion = requestVersionRef.current;
     setRuntime((current) => ({ ...current, loading: true, error: "" }));
 
     try {
@@ -219,9 +223,11 @@ export function useProtectionRuntime({
         config.deviceName,
         config.valueSetTemplate.replace("{value}", normalizedValue),
       );
+      if (!mountedRef.current || requestVersionRef.current !== requestVersion) return;
       setDraftValue("");
       await refreshRuntime("write-verify");
     } catch (error) {
+      if (!mountedRef.current || requestVersionRef.current !== requestVersion) return;
       setRuntime((current) => ({
         ...current,
         loading: false,
@@ -231,27 +237,31 @@ export function useProtectionRuntime({
   }, [config, draftValue, refreshRuntime, runnable, runtime.loading, sendScpiCommand]);
 
   const handleToggleEnabled = useCallback(async () => {
+    if (!runnable) return;
+    const requestVersion = requestVersionRef.current;
     const command =
       runtime.enabledState === "enabled" ? config.enableOffCommand : config.enableOnCommand;
     setRuntime((current) => ({ ...current, loading: true, error: "" }));
 
     try {
       await sendProtectionCommand(sendScpiCommand, config.deviceName, command);
+      if (!mountedRef.current || requestVersionRef.current !== requestVersion) return;
       await refreshRuntime("write-verify");
     } catch (error) {
+      if (!mountedRef.current || requestVersionRef.current !== requestVersion) return;
       setRuntime((current) => ({
         ...current,
         loading: false,
         error: error instanceof Error ? error.message : "Enable update failed.",
       }));
     }
-  }, [config, refreshRuntime, runtime.enabledState, sendScpiCommand]);
+  }, [config, refreshRuntime, runnable, runtime.enabledState, sendScpiCommand]);
 
   return {
     draftValue,
     handleApplyThreshold,
     handleToggleEnabled,
-    runtime,
+    runtime: runnable ? runtime : INITIAL_RUNTIME_STATE,
     setDraftValue,
   };
 }

@@ -20,12 +20,14 @@ import { normalizeScpiQuery, validateScpiQuery } from "./scpiQueryValidation.js"
 import { decodeBase64Payload } from "../ws/wsEnvelope.js";
 
 const DEFAULT_SNAPSHOT = Object.freeze({
+  disconnected: false,
   value: "",
   points: [],
   updatedAt: 0,
   loading: false,
   error: "",
 });
+const DISCONNECTED_SNAPSHOT = Object.freeze({ ...DEFAULT_SNAPSHOT, disconnected: true });
 
 /**
  * Owns shared SCPI query polling and latest-value cache.
@@ -33,6 +35,7 @@ const DEFAULT_SNAPSHOT = Object.freeze({
  * @param {object} options
  * @param {(message: string, tag?: string) => boolean} options.sendWsMessage
  * @param {import("react").MutableRefObject<boolean>} options.wsConnectedRef
+ * @param {(deviceName: string, error: string) => boolean} [options.onScpiError] - Returns true for a confirmed disconnect.
  * @param {() => {devices: Array<{name: string, id: string}>, deviceByName?: Map<string, {name: string, id: string}>, deviceStatuses: Record<string, {state?: string}>}} options.getDeviceState
  * @returns {{
  *   subscribeScpiQuery: (subscription: {widgetId: string, deviceName: string, query: string, frequencyHz: number}) => () => void,
@@ -44,7 +47,7 @@ const DEFAULT_SNAPSHOT = Object.freeze({
  *   clearScpiScheduler: () => void
  * }}
  */
-export function useScpiQueryScheduler({ sendWsMessage, wsConnectedRef, getDeviceState }) {
+export function useScpiQueryScheduler({ sendWsMessage, wsConnectedRef, getDeviceState, onScpiError }) {
   const subscriptionsRef = useRef(new Map());
   const identitySubscriptionsRef = useRef(new Map());
   const timersRef = useRef(new Map());
@@ -54,13 +57,15 @@ export function useScpiQueryScheduler({ sendWsMessage, wsConnectedRef, getDevice
   const pendingIdentitySetRef = useRef(new Set());
   const sendWsMessageRef = useRef(sendWsMessage);
   const getDeviceStateRef = useRef(getDeviceState);
+  const onScpiErrorRef = useRef(onScpiError);
 
   useEffect(() => clearScpiScheduler, []);
 
   useEffect(() => {
     sendWsMessageRef.current = sendWsMessage;
     getDeviceStateRef.current = getDeviceState;
-  }, [getDeviceState, sendWsMessage]);
+    onScpiErrorRef.current = onScpiError;
+  }, [getDeviceState, sendWsMessage, onScpiError]);
 
   const subscribeScpiQuery = useCallback((subscription) => {
     const normalized = normalizeSubscription(subscription);
@@ -125,7 +130,18 @@ export function useScpiQueryScheduler({ sendWsMessage, wsConnectedRef, getDevice
 
     pendingByUuidRef.current.delete(message.uuid);
     pendingIdentitySetRef.current.delete(pending.identity);
-    const isError = message.payload.startsWith("ERR ");
+    const payload = String(message.payload).trim();
+    const isError = payload.startsWith("ERR ");
+    if (isError && onScpiErrorRef.current?.(pending.deviceName, payload)) {
+      for (const [identity, group] of identitySubscriptionsRef.current) {
+        if (group.subscriptions.values().next().value?.deviceName === pending.deviceName) {
+          removePendingIdentity(identity);
+          pendingIdentitySetRef.current.delete(identity);
+          setSnapshot(identity, DISCONNECTED_SNAPSHOT);
+        }
+      }
+      return true;
+    }
     const previous = cacheRef.current.get(pending.identity) || DEFAULT_SNAPSHOT;
     setSnapshot(pending.identity, {
       ...previous,
@@ -211,7 +227,14 @@ export function useScpiQueryScheduler({ sendWsMessage, wsConnectedRef, getDevice
 
   function pollIdentity(identity) {
     const subscription = getPrimarySubscription(identity);
-    if (!subscription || !canPoll(subscription)) {
+    if (!subscription) {
+      return;
+    }
+
+    if (!canPoll(subscription)) {
+      removePendingIdentity(identity);
+      pendingIdentitySetRef.current.delete(identity);
+      setSnapshot(identity, DISCONNECTED_SNAPSHOT);
       return;
     }
 
@@ -220,7 +243,7 @@ export function useScpiQueryScheduler({ sendWsMessage, wsConnectedRef, getDevice
     }
 
     const previous = cacheRef.current.get(identity) || DEFAULT_SNAPSHOT;
-    setSnapshot(identity, { ...previous, loading: true, error: "" });
+    setSnapshot(identity, { ...previous, disconnected: false, loading: true, error: "" });
     const uuid = sendWsMessageRef.current(
       `CMD ${subscription.deviceName} ${subscription.query}`,
       MONITOR_TAG.SCHEDULER,
@@ -234,7 +257,7 @@ export function useScpiQueryScheduler({ sendWsMessage, wsConnectedRef, getDevice
       return;
     }
 
-    pendingByUuidRef.current.set(uuid, { identity });
+    pendingByUuidRef.current.set(uuid, { identity, deviceName: subscription.deviceName });
     pendingIdentitySetRef.current.add(identity);
   }
 
@@ -345,6 +368,7 @@ export function useScpiQueryScheduler({ sendWsMessage, wsConnectedRef, getDevice
 
 function snapshotsEqual(first, second) {
   return (
+    first.disconnected === second.disconnected &&
     first.value === second.value &&
     first.points === second.points &&
     first.updatedAt === second.updatedAt &&
