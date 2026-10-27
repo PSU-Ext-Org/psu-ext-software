@@ -13,37 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { CHART_HISTORY_STORAGE_KEY } from "./chart/storage/chartHistoryStorage.js";
-import { XY_CHART_HISTORY_STORAGE_KEY } from "./xyChart/storage/xyChartHistoryStorage.js";
+import { clearChartDeviceHistory } from "./chart/storage/clearChartDeviceHistory.js";
+import { clearXyChartDeviceHistory } from "./xyChart/storage/clearXyChartDeviceHistory.js";
 
 /**
- * Removes saved SCPI readings for a disconnected device, including widgets that are not mounted.
- * Other devices' time series and all widget configuration are preserved.
+ * Removes saved readings for one unavailable device, including unmounted widgets.
+ * Widget settings and other devices' readings remain intact.
  * @param {string} deviceName
  */
 export function clearDeviceScpiHistory(deviceName) {
-  for (const key of [CHART_HISTORY_STORAGE_KEY, XY_CHART_HISTORY_STORAGE_KEY]) {
-    try {
-      const records = JSON.parse(window.localStorage.getItem(key) || "{}");
-      let changed = false;
-      for (const [id, record] of Object.entries(records)) {
-        if (key === XY_CHART_HISTORY_STORAGE_KEY) {
-          if (record?.x?.deviceName === deviceName || record?.y?.deviceName === deviceName) {
-            delete records[id];
-            changed = true;
-          }
-        } else if (Array.isArray(record?.series)) {
-          for (const series of record.series) {
-            if (series.deviceName === deviceName && series.points?.length) {
-              series.points = [];
-              changed = true;
-            }
-          }
-        }
-      }
-      if (changed) window.localStorage.setItem(key, JSON.stringify(records));
-    } catch {
-      // Missing or unavailable local storage must not prevent connection cleanup.
-    }
-  }
+  clearChartDeviceHistory(deviceName);
+  clearXyChartDeviceHistory(deviceName);
 }

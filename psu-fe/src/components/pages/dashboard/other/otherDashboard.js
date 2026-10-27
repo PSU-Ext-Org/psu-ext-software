@@ -13,19 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { ChartCard, ChartCardActions, ChartCardTitle } from "../../../widgets/chart";
-import {
-  SingleValueCard,
-  SingleValueCardActions,
-  SingleValueCardTitle,
-} from "../../../widgets/singleValue";
+import { createOperatorWidgetCatalog } from "../operatorWidgetCatalog.js";
 import { deleteStoredWidgetConfig } from "../../../widgets/widgetConfigStore.js";
-import {
-  deleteXyChartHistory,
-  XyChartCard,
-  XyChartCardActions,
-  XyChartCardTitle,
-} from "../../../widgets/xyChart";
+import { deleteXyChartHistory } from "../../../widgets/xyChart";
 
 /** Configurable dashboard definition for the secondary operator workspace. */
 export const otherDashboard = {
@@ -36,37 +26,7 @@ export const otherDashboard = {
   layout: {
     defaultLayout: [],
   },
-  widgets: {
-    available: [
-      { type: "singleValue", label: "Single Value", idPrefix: "single-value-other", w: 1, h: 1 },
-      { type: "chart", label: "Chart 2x1", idPrefix: "chart-other-small", w: 2, h: 1 },
-      { type: "chart", label: "Chart 2x2", idPrefix: "chart-other-medium", w: 2, h: 2 },
-      { type: "chart", label: "Chart 3x2", idPrefix: "chart-other-large", w: 3, h: 2 },
-      { type: "xyChart", label: "XY Chart 2x2", idPrefix: "xy-chart-other-medium", w: 2, h: 2 },
-      { type: "xyChart", label: "XY Chart 3x2", idPrefix: "xy-chart-other-large", w: 3, h: 2 },
-    ],
-    definitions: {
-      chart: {
-        actions: ChartCardActions,
-        render: ChartCard,
-        text: "Live SCPI trend.",
-        title: ChartCardTitle,
-      },
-      xyChart: {
-        actions: XyChartCardActions,
-        render: XyChartCard,
-        text: "SCPI X-Y plot.",
-        title: XyChartCardTitle,
-      },
-      singleValue: {
-        actions: SingleValueCardActions,
-        render: SingleValueCard,
-        text: "Cached SCPI query value.",
-        title: SingleValueCardTitle,
-      },
-    },
-    editable: true,
-  },
+  widgets: createOperatorWidgetCatalog("other"),
 };
 
 /**
