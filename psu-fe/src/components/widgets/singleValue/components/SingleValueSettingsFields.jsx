@@ -13,7 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-/** Renders editable target, command, and appearance settings. */
+/**
+ * Renders polling, optional write, and appearance settings for the dialog draft.
+ * Hidden write fields remain in the draft so disabling does not erase them.
+ *
+ * @param {object} props
+ * @param {object} props.draft - Editable config; frequency may be an input string.
+ * @param {Array<{id: string, name: string}>} props.deviceOptions
+ * @param {(key: string, value: string | boolean) => void} props.updateDraft
+ * @returns {import("react").ReactElement}
+ */
 export function SingleValueSettingsFields({ draft, deviceOptions, updateDraft }) {
   return (
     <>
@@ -42,6 +51,45 @@ export function SingleValueSettingsFields({ draft, deviceOptions, updateDraft })
           value={draft.query}
         />
       </label>
+
+      <fieldset className="grid gap-3 rounded-md border border-slate-200 p-3">
+        <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
+          <input
+            checked={draft.setValueEnabled}
+            onChange={(event) => updateDraft("setValueEnabled", event.target.checked)}
+            type="checkbox"
+          />
+          Enable value setting
+        </label>
+
+        {draft.setValueEnabled ? (
+          <>
+            <label className="grid gap-1.5 text-sm font-medium text-slate-700">
+              Set value SCPI command
+              <input
+                className="control-standard w-full border border-slate-300"
+                onChange={(event) => updateDraft("setValueCommand", event.target.value)}
+                placeholder="MEAS:CURR:REL CH1, {value}"
+                value={draft.setValueCommand}
+              />
+            </label>
+
+            <p className="text-xs text-slate-600">
+              Use exactly one {"{value}"} placeholder for the value to send.
+            </p>
+
+            <label className="grid gap-1.5 text-sm font-medium text-slate-700">
+              Default value
+              <input
+                className="control-standard w-full border border-slate-300"
+                onChange={(event) => updateDraft("defaultValue", event.target.value)}
+                placeholder="Optional"
+                value={draft.defaultValue}
+              />
+            </label>
+          </>
+        ) : null}
+      </fieldset>
 
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="grid gap-1.5 text-sm font-medium text-slate-700">

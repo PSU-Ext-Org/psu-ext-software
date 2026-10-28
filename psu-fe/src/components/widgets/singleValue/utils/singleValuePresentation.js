@@ -14,9 +14,15 @@
  * limitations under the License.
  */
 import { normalizeScpiQuery, validateScpiQuery } from "../../../../connection/ws-proxy/scpi/scpiQueryValidation.js";
+import { validateSetValueConfig } from "./singleValueCommands.js";
 import { normalizeFrequency } from "../singleValueConfig.js";
 
-/** Validates the editable target, query, and polling frequency. */
+/**
+ * Validates polling settings and, when enabled, the optional write settings.
+ *
+ * @param {object} draft - Editable widget configuration before normalization.
+ * @returns {string[]} Validation messages in settings order.
+ */
 export function validateDraft(draft) {
   const errors = [];
   const frequency = normalizeFrequency(draft.frequencyHz);
@@ -34,10 +40,23 @@ export function validateDraft(draft) {
     errors.push("Frequency must be between 0.1 Hz and 100 Hz.");
   }
 
+  if (draft.setValueEnabled) {
+    const writeError = validateSetValueConfig(draft);
+
+    if (writeError) {
+      errors.push(writeError);
+    }
+  }
+
   return errors;
 }
 
-/** Returns the first issue preventing value polling. */
+/**
+ * Returns the first issue preventing measurement polling, independent of write settings.
+ *
+ * @param {{deviceName: string, query: string}} config
+ * @returns {string} Validation message, or an empty string when polling is configured.
+ */
 export function validateRunnableConfig(config) {
   if (!config.deviceName || !config.query) {
     return "Configure this card.";
@@ -46,7 +65,18 @@ export function validateRunnableConfig(config) {
   return validateScpiQuery(config.query);
 }
 
-/** Formats connection and measurement status for the value card. */
+/**
+ * Formats the highest-priority connection or measurement status for the value card.
+ *
+ * @param {object} options
+ * @param {{query: string}} options.config
+ * @param {object | undefined} options.device - Device matching the configured name.
+ * @param {boolean} options.deviceConnected
+ * @param {{loading: boolean, value: string, error: string, updatedAt: number}} options.snapshot
+ * @param {string} options.validationError
+ * @param {boolean} options.wsConnected
+ * @returns {string} User-facing card status.
+ */
 export function getStatusText({ config, device, deviceConnected, snapshot, validationError, wsConnected }) {
   if (validationError) {
     return validationError;

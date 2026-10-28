@@ -142,6 +142,7 @@ export function WebSocketConnectionProvider({ children }) {
     subscribeScpiQuery: scheduler.subscribeScpiQuery,
     subscribeScpiSnapshot: scheduler.subscribeScpiSnapshot,
     getScpiQuerySnapshot: scheduler.getScpiQuerySnapshot,
+    refreshScpiQuery: scheduler.refreshScpiQuery,
     clearWsMessages: monitor.clearWsMessages,
   }), [
     config, session.wsConnected, session.wsConnecting, devices.devices,
@@ -149,7 +150,7 @@ export function WebSocketConnectionProvider({ children }) {
     devices.deviceConnectingIds, identity.deviceIdentity, monitor.appendWsMessage,
     settings.updateConfig, settings.saveConfig, settings.setWsDeviceAutoConnect,
     connectWs, commands.sendScpiCommand, scheduler.subscribeScpiQuery,
-    scheduler.subscribeScpiSnapshot, scheduler.getScpiQuerySnapshot,
+    scheduler.subscribeScpiSnapshot, scheduler.getScpiQuerySnapshot, scheduler.refreshScpiQuery,
   ]);
 
   return (

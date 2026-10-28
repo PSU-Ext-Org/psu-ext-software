@@ -23,7 +23,14 @@ import { useSingleValueDraft } from "../hooks/useSingleValueDraft.js";
 import { validateDraft } from "../utils/singleValuePresentation.js";
 import { SingleValueSettingsFields } from "./SingleValueSettingsFields.jsx";
 
-/** Opens and saves settings for one persisted singleValue widget. */
+/**
+ * Opens an isolated settings draft and persists it only after a valid submission.
+ *
+ * @param {object} props
+ * @param {boolean} [props.iconOnly=false] - Render a compact dashboard header action.
+ * @param {{id: string}} props.placement - Identifies the persisted widget configuration.
+ * @returns {import("react").ReactElement}
+ */
 export function SingleValueSettingsButton({ iconOnly = false, placement }) {
   const { devices = [], deviceStatuses = {} } = useWebSocketConnection();
   const [config, setConfig] = useSingleValueConfig(placement.id);
@@ -46,6 +53,7 @@ export function SingleValueSettingsButton({ iconOnly = false, placement }) {
     }
   }, [config, open, resetDraft]);
 
+  /** Prevents invalid drafts from replacing the persisted widget configuration. */
   function handleSubmit(event) {
     event.preventDefault();
     if (errors.length) {
@@ -81,7 +89,7 @@ export function SingleValueSettingsButton({ iconOnly = false, placement }) {
           ref={dialogRef}
         >
           <form
-            className="grid w-full max-w-lg gap-4 rounded-lg border border-slate-200 bg-white p-5 shadow-xl"
+            className="grid max-h-full w-full max-w-lg overflow-y-auto gap-4 rounded-lg border border-slate-200 bg-white p-5 shadow-xl"
             onSubmit={handleSubmit}
           >
             <div className="flex min-w-0 items-start justify-between gap-4">

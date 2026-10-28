@@ -18,6 +18,7 @@ import { useWebSocketConnection } from "../../../../connection/ws-proxy/WebSocke
 import { DEFAULT_SINGLE_VALUE_CONFIG, useSingleValueConfig } from "../singleValueConfig.js";
 import { useSingleValueSnapshot } from "../hooks/useSingleValueSnapshot.js";
 import { getStatusText, validateRunnableConfig } from "../utils/singleValuePresentation.js";
+import { SingleValueSetControls } from "./SingleValueSetControls.jsx";
 import { SingleValueSettingsButton } from "./SingleValueSettingsButton.jsx";
 
 /**
@@ -43,13 +44,15 @@ export function SingleValueCardActions({ placement }) {
 }
 
 /**
- * 1x1 dashboard widget that displays one cached SCPI query value.
+ * Displays a shared SCPI measurement and optional controls for explicit value writes.
  *
  * @param {{placement: {id: string}}} props
  * @returns {import("react").ReactElement}
  */
 export function SingleValueCard({ placement }) {
   const {
+    sendScpiCommand,
+    refreshScpiQuery,
     getScpiQuerySnapshot,
     subscribeScpiSnapshot,
     wsConnected,
@@ -86,8 +89,8 @@ export function SingleValueCard({ placement }) {
   }
 
   return (
-    <div className="flex min-h-full flex-col gap-3">
-      <div className="min-w-0 rounded-md bg-slate-100 px-3 py-3">
+    <div className="flex h-full min-h-0 flex-col gap-2">
+      <div className="min-w-0 shrink-0 rounded-md bg-slate-100 px-3 py-2">
         <p
           className="truncate text-3xl font-semibold leading-tight"
           data-testid={`single-value-${placement.id}`}
@@ -95,9 +98,23 @@ export function SingleValueCard({ placement }) {
         >
           {wsConnected && deviceConnected ? snapshot.value || "--" : "--"}
         </p>
-        <p className="mt-1 truncate text-sm font-medium text-slate-600">{config.unit || "\u00a0"}</p>
+
+        {config.setValueEnabled ? (
+          <SingleValueSetControls
+            config={config}
+            connected={wsConnected && deviceConnected && !validationError}
+            refreshScpiQuery={refreshScpiQuery}
+            sendScpiCommand={sendScpiCommand}
+            snapshot={snapshot}
+          />
+        ) : (
+          <p className="mt-1 truncate text-sm font-medium text-slate-600">
+            {config.unit || "\u00a0"}
+          </p>
+        )}
       </div>
-      <div className="mt-auto grid gap-1 text-xs text-slate-600">
+
+      <div className="mt-auto grid shrink-0 text-xs text-slate-600">
         <div className="flex min-w-0 justify-between gap-3">
           <span className="shrink-0">Target</span>
           <strong className="min-w-0 truncate text-right">{config.deviceName}</strong>
