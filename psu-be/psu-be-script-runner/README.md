@@ -194,6 +194,19 @@ the ID, display name, and normalized tags for each `<id>.js` file. Packaged
 builtin sources are never copied into user storage and cannot be changed
 through the API.
 
+### Automated current-temperature curve script
+
+The [automated current-temperature curve script](src/main/resources/scripts/builtin/system/automated-current-temperature-curve.js)
+uses PSU-EXT CH1 and an ET5410A electronic load with a manually configured source.
+Set the device IDs and bench limits at the start before running it. It sweeps
+upward in 20 mA steps through 2 A, keeping the relay closed between points.
+Each point requires two consecutive six-sample temperature averages within
+0.3 degrees Celsius, with readings every five seconds and a 30-minute point timeout.
+It records live readings and settled current/temperature pairs, stops at 70 degrees
+Celsius or faults above 2.2 A measured current, and attempts to turn both outputs
+off on completion, failure, or cancellation. Verify outputs after an abort because
+cancellation or transport failures can prevent cleanup writes.
+
 ### PSU-EXT voltage calibration builtin
 
 `calibrate-psu-ext-voltage` calibrates one PSU-EXT voltage channel using a
