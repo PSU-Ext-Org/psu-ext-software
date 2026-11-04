@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+import { defaultDashboardTwoLayout, defaultDashboardTwoWidgetConfigs } from "./dashboardTwoDefaults.js";
 import { createOperatorWidgetCatalog } from "../operatorWidgetCatalog.js";
 import { deleteStoredWidgetConfig } from "../../../widgets/widgetConfigStore.js";
 import { deleteXyChartHistory } from "../../../widgets/xyChart";
@@ -24,7 +25,8 @@ export const otherDashboard = {
     storageKey: "psu-ext.dashboard.other-layout.v1",
   },
   layout: {
-    defaultLayout: [],
+    defaultLayout: defaultDashboardTwoLayout,
+    defaultWidgetConfigs: defaultDashboardTwoWidgetConfigs,
   },
   widgets: createOperatorWidgetCatalog("other"),
 };

@@ -98,6 +98,9 @@ describe("AppHeader", () => {
   it("places the terminal action after config and opens the monitor dialog", () => {
     renderHeader();
 
+    expect(screen.getByRole("link", { name: "Dashboard 1" })).toHaveAttribute("href", "/dashboard-1");
+    expect(screen.getByRole("link", { name: "Dashboard 2" })).toHaveAttribute("href", "/dashboard-2");
+
     const nav = screen.getByRole("navigation", { name: "Primary navigation" });
     const navControlLabels = [...within(nav).getAllByRole("link"), ...within(nav).getAllByRole("button")]
       .sort((first, second) => {
@@ -108,8 +111,8 @@ describe("AppHeader", () => {
 
     expect(navControlLabels).toEqual([
       "IDE",
-      "Dashboard",
-      "Extra",
+      "Dashboard 1",
+      "Dashboard 2",
       "Config",
       "Open WebSocket monitor",
     ]);

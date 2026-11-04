@@ -22,6 +22,10 @@ import {
 import { findAvailablePlacement, isPlacementAvailable } from "../domain/dashboardPlacement.js";
 import { createWidget } from "../domain/dashboardWidgetCatalog.js";
 import { useDashboardWidgetPicker } from "./useDashboardWidgetPicker.js";
+import { loadStoredWidgetConfigs, saveStoredWidgetConfig } from "../../widgets/widgetConfigStore.js";
+
+/** @typedef {import("../domain/dashboardTypes.js").DashboardLayout} DashboardLayout */
+/** @typedef {import("../domain/dashboardTypes.js").DashboardWidgets} DashboardWidgets */
 
 /**
  * Owns a dashboard's persisted layout and edit-mode actions.
@@ -29,15 +33,15 @@ import { useDashboardWidgetPicker } from "./useDashboardWidgetPicker.js";
  * @param {object} options
  * @param {object} options.dashboard - Complete dashboard configuration grouped by concern.
  * @param {{pageId: string, storageKey: string}} options.dashboard.identity
- * @param {{defaultLayout: Array<import("../domain/dashboardTypes.js").WidgetPlacement>, columns: number, rowHeight: number, gridTemplateRows?: string}} options.dashboard.layout
- * @param {{definitions: Record<string, import("../domain/dashboardTypes.js").WidgetDefinition>, available: Array<import("../domain/dashboardTypes.js").AvailableWidget>, editable: boolean}} options.dashboard.widgets
+ * @param {DashboardLayout & {columns: number, rowHeight: number}} options.dashboard.layout
+ * @param {Required<DashboardWidgets>} options.dashboard.widgets
  * @param {(placement: import("../domain/dashboardTypes.js").WidgetPlacement) => void} [options.onWidgetRemoved]
  * @returns {object} Layout state and actions for a dashboard page.
  */
 export function useDashboardLayout({ dashboard, onWidgetRemoved }) {
   const { identity, layout, widgets: widgetCatalog } = dashboard;
   const { pageId, storageKey } = identity;
-  const { columns, defaultLayout, gridTemplateRows, rowHeight } = layout;
+  const { columns, defaultLayout, defaultWidgetConfigs, gridTemplateRows, rowHeight } = layout;
   const { available: availableWidgets, definitions: widgets, editable } = widgetCatalog;
   const [editMode, setEditMode] = useState(false);
   const [layoutRecord, setLayoutRecord] = useState(() =>
@@ -48,6 +52,16 @@ export function useDashboardLayout({ dashboard, onWidgetRemoved }) {
   useEffect(() => {
     saveLayoutRecord(storageKey, layoutRecord);
   }, [layoutRecord, storageKey]);
+
+  useEffect(() => {
+    if (!defaultWidgetConfigs) return;
+    const storedConfigs = loadStoredWidgetConfigs();
+    for (const { id } of layoutRecord.widgets) {
+      if (Object.hasOwn(defaultWidgetConfigs, id) && !Object.hasOwn(storedConfigs, id)) {
+        saveStoredWidgetConfig(id, defaultWidgetConfigs[id]);
+      }
+    }
+  }, [defaultWidgetConfigs, layoutRecord.widgets]);
 
   const addWidget = useCallback(() => {
     if (!widgetPicker.selectedWidget) {

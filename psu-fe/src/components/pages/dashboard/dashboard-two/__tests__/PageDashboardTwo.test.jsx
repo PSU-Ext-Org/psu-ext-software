@@ -14,8 +14,12 @@
  * limitations under the License.
  */
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { PageOther } from "../PageOther.jsx";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { PageDashboardTwo } from "../PageDashboardTwo.jsx";
+import { defaultDashboardTwoLayout, defaultDashboardTwoWidgetConfigs } from "../dashboardTwoDefaults.js";
+import { loadStoredWidgetConfigs } from "../../../../widgets/widgetConfigStore.js";
+import { CHART_HISTORY_STORAGE_KEY } from "../../../../widgets/chart";
+import { getAllRunnableWidgetSubscriptions } from "../../../../widgets/widgetConfigRegistry.js";
 import { removeOtherWidgetData } from "../otherDashboard.js";
 import { XY_CHART_HISTORY_STORAGE_KEY } from "../../../../widgets/xyChart";
 
@@ -35,7 +39,13 @@ vi.mock("../../../../../connection/ws-proxy/WebSocketConnectionContext.jsx", () 
   useWebSocketConnection: () => mockConnection,
 }));
 
-describe("PageOther", () => {
+describe("PageDashboardTwo", () => {
+  beforeEach(() => {
+    window.localStorage.setItem("psu-ext.dashboard.other-layout.v1", JSON.stringify({
+      layoutId: "existing-empty", widgets: [],
+    }));
+  });
+
   afterEach(() => {
     cleanup();
     window.localStorage.clear();
@@ -50,21 +60,55 @@ describe("PageOther", () => {
     mockConnection.getScpiQuerySnapshot.mockClear();
   });
 
-  it("renders the other widgets through the reusable dashboard shell", () => {
-    render(<PageOther />);
+  it("initializes the supplied Power chart and polling settings without history", () => {
+    window.localStorage.clear();
+    render(<PageDashboardTwo />);
 
-    expect(screen.getByLabelText("Dashboard widget grid")).toBeInTheDocument();
-    expect(JSON.parse(window.localStorage.getItem("psu-ext.dashboard.other-layout.v1")).widgets).toEqual([]);
-    expect(screen.queryByText("Single Value")).not.toBeInTheDocument();
-    expect(screen.queryByText("Control")).not.toBeInTheDocument();
-    expect(screen.queryByText("WebSocket Proxy")).not.toBeInTheDocument();
-    expect(screen.queryByText("Device Link")).not.toBeInTheDocument();
-    expect(screen.queryByText("Telemetry")).not.toBeInTheDocument();
-    expect(screen.queryByText("Workflows")).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Power" })).toBeInTheDocument();
+    expect(screen.getAllByRole("article")).toHaveLength(1);
+    expect(JSON.parse(localStorage.getItem("psu-ext.dashboard.other-layout.v1")).widgets)
+      .toEqual(defaultDashboardTwoLayout);
+    expect(loadStoredWidgetConfigs()).toEqual(defaultDashboardTwoWidgetConfigs);
+    expect(getAllRunnableWidgetSubscriptions()).toEqual([
+      expect.objectContaining({
+        deviceName: "PSUEXT1", query: "MEAS:POWER:DATA? CH1", frequencyHz: 1,
+      }),
+    ]);
+    const history = JSON.parse(localStorage.getItem(CHART_HISTORY_STORAGE_KEY) || "{}");
+    for (const chart of Object.values(history)) {
+      expect(chart.series.every((series) => series.points.length === 0)).toBe(true);
+    }
+  });
+
+  it("preserves an intentionally empty saved dashboard", () => {
+    render(<PageDashboardTwo />);
+    expect(screen.queryAllByRole("article")).toHaveLength(0);
+    expect(loadStoredWidgetConfigs()).toEqual({});
+  });
+
+  it("preserves saved chart settings", () => {
+    const id = defaultDashboardTwoLayout[0].id;
+    const config = { ...defaultDashboardTwoWidgetConfigs[id], cardName: "Custom Power" };
+    localStorage.setItem("psu-ext.dashboard.other-layout.v1", JSON.stringify({
+      layoutId: "custom-layout", widgets: defaultDashboardTwoLayout,
+    }));
+    localStorage.setItem("psu-ext.widget-configs.v1", JSON.stringify({ [id]: config }));
+    render(<PageDashboardTwo />);
+    expect(screen.getByRole("heading", { name: "Custom Power" })).toBeInTheDocument();
+    expect(loadStoredWidgetConfigs()).toEqual({ [id]: config });
+  });
+
+  it("restores the default chart and missing settings on reset", () => {
+    render(<PageDashboardTwo />);
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    fireEvent.click(screen.getByRole("button", { name: "Reset" }));
+    expect(JSON.parse(localStorage.getItem("psu-ext.dashboard.other-layout.v1")).widgets)
+      .toEqual(defaultDashboardTwoLayout);
+    expect(loadStoredWidgetConfigs()).toEqual(defaultDashboardTwoWidgetConfigs);
   });
 
   it("shows the configurable single-value placeholder", () => {
-    render(<PageOther />);
+    render(<PageDashboardTwo />);
 
     fireEvent.click(screen.getByRole("button", { name: "Edit" }));
     expect(screen.getByLabelText("Widget type")).toHaveValue("singleValue:single-value-other:Single Value:1:1");
@@ -83,7 +127,7 @@ describe("PageOther", () => {
   });
 
   it("adds chart placeholders with selectable 2x1, 2x2, and 3x2 placements", () => {
-    render(<PageOther />);
+    render(<PageDashboardTwo />);
 
     fireEvent.click(screen.getByRole("button", { name: "Edit" }));
     fireEvent.change(screen.getByLabelText("Widget type"), {
@@ -141,7 +185,7 @@ describe("PageOther", () => {
   });
 
   it("adds X-Y charts from edit mode with selectable 2x2 and 3x2 placements", () => {
-    render(<PageOther />);
+    render(<PageDashboardTwo />);
 
     fireEvent.click(screen.getByRole("button", { name: "Edit" }));
     fireEvent.change(screen.getByLabelText("Widget type"), {

@@ -48,4 +48,24 @@
  * @property {number} [h]
  */
 
+/**
+ * Initial widget positions, settings, and dashboard grid geometry.
+ *
+ * @typedef {object} DashboardLayout
+ * @property {Array<WidgetPlacement>} defaultLayout
+ * @property {Record<string, object>} [defaultWidgetConfigs]
+ * @property {number} [columns] - Number of horizontal grid slots.
+ * @property {number} [rowHeight] - Pixel height of one grid row.
+ * @property {string} [gridTemplateRows] - Explicit CSS grid-template-rows value.
+ */
+
+/**
+ * Widget registry and dashboard edit policy.
+ *
+ * @typedef {object} DashboardWidgets
+ * @property {Record<string, WidgetDefinition>} definitions - Renderers keyed by widget type.
+ * @property {Array<AvailableWidget>} [available] - Widget variants users can add.
+ * @property {boolean} [editable] - Whether users can edit the dashboard layout.
+ */
+
 export {};

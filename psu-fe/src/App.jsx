@@ -18,8 +18,8 @@ import { ScriptRunnerHttpProvider } from "./connection/http-script/ScriptRunnerH
 import { WebSocketConnectionProvider } from "./connection/ws-proxy/WebSocketConnectionContext.jsx";
 import { AppFooter } from "./components/layout/app/AppFooter.jsx";
 import { AppHeader } from "./components/layout/app/AppHeader.jsx";
-import { PageDashboard } from "./components/pages/dashboard/operator/PageDashboard.jsx";
-import { PageOther } from "./components/pages/dashboard/other/PageOther.jsx";
+import { PageDashboard } from "./components/pages/dashboard/dashboard-one/PageDashboard.jsx";
+import { PageDashboardTwo } from "./components/pages/dashboard/dashboard-two/PageDashboardTwo.jsx";
 import { PageConfigProxy } from "./components/pages/dashboard/proxy/PageConfigProxy.jsx";
 import { PageIde } from "./components/pages/ide/PageIde.jsx";
 
@@ -40,12 +40,12 @@ function AppFrame() {
     <>
       {!ide ? <AppHeader /> : null}
         <Routes>
-        <Route path="/" element={<PageDashboard />} />
-        <Route path="/extra" element={<PageOther />} />
-        <Route path="/dashboard" element={<PageDashboard />} />
+        <Route path="/" element={<Navigate to="/dashboard-1" replace />} />
+        <Route path="/dashboard-1" element={<PageDashboard />} />
+        <Route path="/dashboard-2" element={<PageDashboardTwo />} />
+        <Route path="/dashboard" element={<Navigate to="/dashboard-1" replace />} />
         <Route path="/conf-proxy" element={<PageConfigProxy />} />
         <Route path="/ide" element={<PageIde />} />
-        <Route path="/scripting" element={<Navigate to="/ide" replace />} />
         <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       {!ide ? <AppFooter /> : null}

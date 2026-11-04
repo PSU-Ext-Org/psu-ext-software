@@ -14,8 +14,11 @@
  * limitations under the License.
  */
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PageDashboard } from "../PageDashboard.jsx";
+import { defaultOperatorLayout, defaultOperatorWidgetConfigs } from "../operatorDashboardDefaults.js";
+import { loadStoredWidgetConfigs } from "../../../../widgets/widgetConfigStore.js";
+import { getAllRunnableWidgetSubscriptions } from "../../../../widgets/widgetConfigRegistry.js";
 import { removeOperatorWidgetData } from "../operatorDashboard.js";
 import { CHART_HISTORY_STORAGE_KEY } from "../../../../widgets/chart";
 import { XY_CHART_HISTORY_STORAGE_KEY } from "../../../../widgets/xyChart";
@@ -35,6 +38,12 @@ vi.mock("../../../../../connection/ws-proxy/WebSocketConnectionContext.jsx", () 
 }));
 
 describe("PageDashboard", () => {
+  beforeEach(() => {
+    window.localStorage.setItem("psu-ext.dashboard.operator-layout.v2", JSON.stringify({
+      layoutId: "existing-empty", widgets: [],
+    }));
+  });
+
   afterEach(() => {
     cleanup();
     window.localStorage.clear();
@@ -44,14 +53,61 @@ describe("PageDashboard", () => {
     mockConnection.sendScpiCommand.mockClear();
   });
 
-  it("defaults to an empty editable dashboard", () => {
+  it("initializes the reference layout and settings without recorded data", () => {
+    window.localStorage.clear();
     render(<PageDashboard />);
 
     expect(screen.getByLabelText("Dashboard widget grid")).toBeInTheDocument();
-    expect(JSON.parse(window.localStorage.getItem("psu-ext.dashboard.operator-layout.v2")).widgets).toEqual([]);
-    expect(screen.queryByText("Output")).not.toBeInTheDocument();
-    expect(screen.queryByText("Telemetry")).not.toBeInTheDocument();
-    expect(screen.queryByText("Limits")).not.toBeInTheDocument();
+    expect(JSON.parse(window.localStorage.getItem("psu-ext.dashboard.operator-layout.v2")).widgets)
+      .toEqual(defaultOperatorLayout);
+    expect(screen.getAllByRole("article")).toHaveLength(12);
+    expect(loadStoredWidgetConfigs()).toEqual(defaultOperatorWidgetConfigs);
+    expect(Object.keys(loadStoredWidgetConfigs()).sort())
+      .toEqual(defaultOperatorLayout.map(({ id }) => id).sort());
+    expect(screen.queryByText("Configure a target device and SCPI query.")).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "OCP CH1" })).toBeInTheDocument();
+    const subscriptions = getAllRunnableWidgetSubscriptions();
+    expect(subscriptions.length).toBeGreaterThan(0);
+    expect(subscriptions.every(({ deviceName }) => deviceName === "PSUEXT1")).toBe(true);
+    expect(subscriptions).toEqual(expect.arrayContaining([
+      expect.objectContaining({ query: "MEAS:VOLT? CH1", frequencyHz: 1 }),
+      expect.objectContaining({ query: "MEAS:VOLT:DATA? CH1", frequencyHz: 2.5 }),
+      expect.objectContaining({ query: "OUTP? CH1", frequencyHz: 1 }),
+      expect.objectContaining({ query: "MEAS:CURR:REL? CH1", frequencyHz: 1 }),
+      expect.objectContaining({ query: "MEAS:ADC:RATE?", frequencyHz: 5 }),
+      expect.objectContaining({ query: "MEAS:CURR:DATA? CH1", frequencyHz: 1 }),
+    ]));
+    const history = JSON.parse(window.localStorage.getItem(CHART_HISTORY_STORAGE_KEY) || "{}");
+    for (const chart of Object.values(history)) {
+      expect(chart.series.every((series) => series.points.length === 0)).toBe(true);
+    }
+    expect(mockConnection.sendScpiCommand).not.toHaveBeenCalled();
+  });
+
+  it("preserves an intentionally empty saved dashboard", () => {
+    render(<PageDashboard />);
+    expect(screen.queryAllByRole("article")).toHaveLength(0);
+    expect(loadStoredWidgetConfigs()).toEqual({});
+  });
+
+  it("preserves saved widget settings and does not seed removed widgets", () => {
+    const placement = defaultOperatorLayout[0];
+    const config = { ...defaultOperatorWidgetConfigs[placement.id], deviceName: "CUSTOM" };
+    window.localStorage.setItem("psu-ext.dashboard.operator-layout.v2", JSON.stringify({
+      layoutId: "custom-layout", widgets: [placement],
+    }));
+    window.localStorage.setItem("psu-ext.widget-configs.v1", JSON.stringify({ [placement.id]: config }));
+    render(<PageDashboard />);
+    expect(screen.getAllByRole("article")).toHaveLength(1);
+    expect(loadStoredWidgetConfigs()).toEqual({ [placement.id]: config });
+  });
+
+  it("restores default placements and missing settings on reset", () => {
+    render(<PageDashboard />);
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    fireEvent.click(screen.getByRole("button", { name: /Reset/ }));
+    expect(screen.getAllByRole("article")).toHaveLength(12);
+    expect(loadStoredWidgetConfigs()).toEqual(defaultOperatorWidgetConfigs);
   });
 
   it("adds a SingleValueCard from edit mode", () => {

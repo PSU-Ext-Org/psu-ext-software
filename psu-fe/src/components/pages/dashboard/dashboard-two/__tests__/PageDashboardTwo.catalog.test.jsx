@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { PageOther } from "../PageOther.jsx";
-import { PageDashboard } from "../../operator/PageDashboard.jsx";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { PageDashboardTwo } from "../PageDashboardTwo.jsx";
+import { PageDashboard } from "../../dashboard-one/PageDashboard.jsx";
 
 const mockConnection = vi.hoisted(() => ({
   wsConnected: false,
@@ -49,12 +49,18 @@ function readWidgetChoices(picker) {
 }
 
 describe("extra dashboard widget catalog", () => {
+  beforeEach(() => {
+    window.localStorage.setItem("psu-ext.dashboard.other-layout.v1", JSON.stringify({
+      layoutId: "existing-empty", widgets: [],
+    }));
+  });
+
   it("offers exactly the main dashboard's widget types, labels, sizes, and order", () => {
     render(<PageDashboard />);
     const dashboardChoices = readWidgetChoices(openWidgetPicker());
     cleanup();
 
-    render(<PageOther />);
+    render(<PageDashboardTwo />);
     expect(readWidgetChoices(openWidgetPicker())).toEqual(dashboardChoices);
   });
 
@@ -66,7 +72,7 @@ describe("extra dashboard widget catalog", () => {
   ])("adds and renders %s independently of the primary layout", (type, label, title, w, h) => {
     const primaryLayout = { layoutId: "primary-saved", widgets: [] };
     localStorage.setItem("psu-ext.dashboard.operator-layout.v2", JSON.stringify(primaryLayout));
-    render(<PageOther />);
+    render(<PageDashboardTwo />);
     const picker = openWidgetPicker();
     const option = Array.from(picker.options).find((entry) => entry.textContent === label);
     expect(option).toBeDefined();

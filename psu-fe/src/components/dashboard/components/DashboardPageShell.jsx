@@ -27,12 +27,9 @@ const DEFAULT_ROW_HEIGHT = 256;
  * @param {object} props
  * @param {object} props.dashboard - Complete dashboard configuration.
  * @param {{pageId: string, storageKey: string}} props.dashboard.identity - Stable page and persistence identifiers.
- * @param {{defaultLayout: Array<WidgetPlacement>, columns?: number, rowHeight?: number, gridTemplateRows?: string}} props.dashboard.layout - Initial positions and grid geometry.
- * @param {{definitions: Record<string, WidgetDefinition>, available?: Array<AvailableWidget>, editable?: boolean}} props.dashboard.widgets - Widget registry and edit policy.
+ * @param {DashboardLayout} props.dashboard.layout - Initial layout and widget settings.
+ * @param {DashboardWidgets} props.dashboard.widgets - Widget registry and edit policy.
  * @param {(placement: WidgetPlacement) => void} [props.onWidgetRemoved] - Called after widget removal.
- * @param {number} [props.columns] - Number of horizontal grid slots.
- * @param {number} [props.rowHeight] - Pixel height for one grid row.
- * @param {string} [props.gridTemplateRows] - Explicit CSS grid-template-rows value.
  * @returns {import("react").ReactElement}
  */
 export function DashboardPageShell({
@@ -69,5 +66,5 @@ export function DashboardPageShell({
 }
 
 /** @typedef {import("../domain/dashboardTypes.js").WidgetPlacement} WidgetPlacement */
-/** @typedef {import("../domain/dashboardTypes.js").WidgetDefinition} WidgetDefinition */
-/** @typedef {import("../domain/dashboardTypes.js").AvailableWidget} AvailableWidget */
+/** @typedef {import("../domain/dashboardTypes.js").DashboardLayout} DashboardLayout */
+/** @typedef {import("../domain/dashboardTypes.js").DashboardWidgets} DashboardWidgets */
