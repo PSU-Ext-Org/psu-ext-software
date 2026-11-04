@@ -21,7 +21,7 @@ import { otherDashboard, removeOtherWidgetData } from "./otherDashboard.js";
  *
  * @returns {import("react").ReactElement}
  */
-export function PageOther() {
+export function PageDashboardTwo() {
   return (
     <DashboardPageShell dashboard={otherDashboard} onWidgetRemoved={removeOtherWidgetData} />
   );

@@ -45,7 +45,7 @@ route handling:
 
 ```text
 http://localhost:5173/#/
-http://localhost:5173/#/dashboard
+http://localhost:5173/#/dashboard-1
 http://localhost:5173/#/conf-proxy
 http://localhost:5173/#/conf-script
 ```
@@ -55,8 +55,8 @@ Routes are declared in `src/App.jsx`.
 The top header is shared across routes. It includes the PSU-EXT CSS logo, route
 navigation, and a terminal icon that opens the WebSocket monitor as a popup.
 
-`/` opens the main operator dashboard. `/dashboard` is an alias for the same
-dashboard. `/other` opens the secondary dashboard route. `/conf-proxy` contains
+`/` redirects to `/dashboard-1` (Dashboard 1). `/dashboard-2` opens Dashboard 2.
+The previous `/dashboard` alias redirects to Dashboard 1. `/conf-proxy` contains
 the WebSocket proxy device manager. `/conf-script` contains a read-only device
 manager configured for the saved Script Runner HTTP API endpoint. `/scripting`
 opens the Script Runner source catalogue.
@@ -258,8 +258,8 @@ when the log is cleared.
 
 `components/pages/` contains route-level pages:
 
-- `PageOther.jsx`: secondary operator dashboard built with the reusable dashboard shell
-- `PageDashboard.jsx`: main operator dashboard built with the same configurable widget system
+- `dashboard/dashboard-two/PageDashboardTwo.jsx`: Dashboard 2 built with the reusable dashboard shell
+- `dashboard/dashboard-one/PageDashboard.jsx`: Dashboard 1 built with the same configurable widget system
 - `PageConfigProxy.jsx`: WebSocket proxy configuration dashboard widgets
 - `PageConfigScript.jsx`: Script Runner HTTP device-manager dashboard widgets
 
@@ -382,11 +382,23 @@ a default layout, and a widget registry; the shell handles the rest.
 
 Current dashboard pages:
 
-- `/`: `PageDashboard.jsx`, persisted under `psu-ext.dashboard.operator-layout.v2`
-- `/dashboard`: `PageDashboard.jsx`, persisted under `psu-ext.dashboard.operator-layout.v2`
-- `/other`: `PageOther.jsx`, persisted under `psu-ext.dashboard.other-layout.v1`
+- `/`: redirects to `/dashboard-1`
+- `/dashboard-1`: Dashboard 1, `PageDashboard.jsx`, persisted under `psu-ext.dashboard.operator-layout.v2`
+- `/dashboard-2`: Dashboard 2, `PageDashboardTwo.jsx`, persisted under `psu-ext.dashboard.other-layout.v1`
 - `/conf-proxy`: `PageConfigProxy.jsx`, persisted under `psu-ext.dashboard.config-layout.v11`
 - `/conf-script`: `PageConfigScript.jsx`, persisted under `psu-ext.dashboard.script-config-layout.v1`
+
+The main operator dashboard starts with the 12-widget layout from
+`df9eee1a-740c-4434-87b8-29bee9fbea37`. Its supplied widget defaults target the
+device name `PSUEXT1`; add and connect that device to receive live readings.
+Dashboard 2 starts with the full-width Power chart from
+`caa7c60d-8ffe-479d-b66a-fd97f5aacbaf`, polling `MEAS:POWER:DATA? CH1`
+on `PSUEXT1` at 1 Hz.
+
+Defaults contain placements and settings, without measurement history or device
+connection details. Existing saved layouts (including empty layouts) and widget
+settings take precedence. **Edit → Reset** restores the default placements and
+fills missing default settings while retaining any saved widget customizations.
 
 The shell stores one layout record per dashboard in `localStorage`:
 

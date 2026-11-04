@@ -76,8 +76,8 @@ export function AppHeader() {
               <FileCode2 aria-hidden="true" className="h-4 w-4" />
               IDE
             </HeaderLink>
-            <HeaderLink to="/" end>Dashboard</HeaderLink>
-            <HeaderLink to="/extra">Extra</HeaderLink>
+            <HeaderLink to="/dashboard-1">Dashboard 1</HeaderLink>
+            <HeaderLink to="/dashboard-2">Dashboard 2</HeaderLink>
             <HeaderLink to="/conf-proxy">Config</HeaderLink>
             <button
               aria-label="Open WebSocket monitor"

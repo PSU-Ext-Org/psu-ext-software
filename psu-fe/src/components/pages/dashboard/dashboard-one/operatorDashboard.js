@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 import { createOperatorWidgetCatalog } from "../operatorWidgetCatalog.js";
+import { defaultOperatorLayout, defaultOperatorWidgetConfigs } from "./operatorDashboardDefaults.js";
 import { deleteChartHistory } from "../../../widgets/chart";
 import { deleteXyChartHistory } from "../../../widgets/xyChart";
 import { deleteStoredWidgetConfig } from "../../../widgets/widgetConfigStore.js";
@@ -25,7 +26,8 @@ export const operatorDashboard = {
     storageKey: "psu-ext.dashboard.operator-layout.v2",
   },
   layout: {
-    defaultLayout: [],
+    defaultLayout: defaultOperatorLayout,
+    defaultWidgetConfigs: defaultOperatorWidgetConfigs,
   },
   widgets: createOperatorWidgetCatalog("dashboard"),
 };
