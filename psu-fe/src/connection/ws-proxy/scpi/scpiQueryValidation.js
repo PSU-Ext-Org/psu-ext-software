@@ -39,7 +39,7 @@ export function normalizeScpiCommand(value) {
 /**
  * Returns a validation error for unsupported dashboard SCPI queries.
  *
- * Dashboard value widgets are query-only. Arguments after the query marker are
+ * Dashboard measurement polling accepts queries. Arguments after the query marker are
  * allowed, for example `MEAS:VOLT? CH1`.
  *
  * @param {unknown} value

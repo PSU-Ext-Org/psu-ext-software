@@ -55,6 +55,25 @@ describe("SingleValueCard config", () => {
     });
   });
 
+  it("persists write settings while disabled and defaults older records to read-only", () => {
+    const legacyConfig = normalizeSingleValueConfig({ type: "singleValue" });
+
+    expect(legacyConfig.setValueEnabled).toBe(false);
+
+    saveSingleValueConfig("write", {
+      setValueEnabled: false,
+      setValueCommand: "VOLT {value}",
+      defaultValue: "0",
+    });
+
+    // Disabled controls keep their command/default for the next time they are enabled.
+    expect(loadSingleValueConfig("write")).toMatchObject({
+      setValueEnabled: false,
+      setValueCommand: "VOLT {value}",
+      defaultValue: "0",
+    });
+  });
+
   it("normalizes malformed records to safe defaults", () => {
     expect(
       normalizeSingleValueConfig({ type: "singleValue", query: "OUTP ON", frequencyHz: 500 }),

@@ -67,6 +67,7 @@
  *   subscribeScpiQuery: Function,
  *   subscribeScpiSnapshot: Function,
  *   getScpiQuerySnapshot: Function,
+ *   refreshScpiQuery: (deviceName: string, query: string) => boolean,
  *   clearWsMessages: Function
  * }} WebSocketConnection
  */

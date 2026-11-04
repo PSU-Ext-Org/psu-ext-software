@@ -34,6 +34,7 @@ export { createQueryIdentity } from "./scpiSubscriptionIndex.js";
  *   getScpiQuerySnapshot: (deviceName: string, query: string) => object,
  *   handleScpiSchedulerMessage: (message: {uuid: string, payload: string}) => boolean,
  *   handleScpiSchedulerBinaryMessage: (message: {uuid: string, payload: string}) => boolean,
+ *   refreshScpiQuery: (deviceName: string, query: string) => boolean,
  *   pollScpiQueries: () => void,
  *   clearScpiScheduler: () => void
  * }}
@@ -82,6 +83,18 @@ function createScheduler(getRuntime) {
     return snapshots.get(createQueryIdentity(deviceName, query));
   }
 
+  /**
+   * Immediately refreshes a subscribed query without waiting for its polling interval.
+   * Any older pending reply loses ownership and cannot overwrite the new measurement.
+   *
+   * @param {string} deviceName - Configured backend device name.
+   * @param {string} query - Query sharing the existing subscription/snapshot identity.
+   * @returns {boolean} Whether a fresh request was sent; does not await its response.
+   */
+  function refreshScpiQuery(deviceName, query) {
+    return polling.refresh(createQueryIdentity(deviceName, query));
+  }
+
   function clearScpiScheduler() {
     polling.clear();
     subscriptions.clear();
@@ -92,6 +105,7 @@ function createScheduler(getRuntime) {
     subscribeScpiQuery,
     subscribeScpiSnapshot,
     getScpiQuerySnapshot,
+    refreshScpiQuery,
     handleScpiSchedulerMessage: polling.handleText,
     handleScpiSchedulerBinaryMessage: polling.handleBinary,
     pollScpiQueries: polling.pollAll,

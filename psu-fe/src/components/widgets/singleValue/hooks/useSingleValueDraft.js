@@ -16,15 +16,24 @@
 import { useCallback, useState } from "react";
 
 const TARGET_FIELDS = ["deviceName", "query", "frequencyHz"];
+const WRITE_FIELDS = ["setValueEnabled", "setValueCommand", "defaultValue"];
 const APPEARANCE_FIELDS = ["unit", "cardName", "valueColor"];
 
-/** Keeps editable settings in cohesive groups without changing the persisted config shape. */
+/**
+ * Keeps polling, writes, and appearance as separate editable settings groups.
+ * Resetting from persisted config discards unsaved edits when the dialog closes.
+ *
+ * @param {typeof import("../singleValueConfig.js").DEFAULT_SINGLE_VALUE_CONFIG} config
+ * @returns {{draft: object, resetDraft: (config: object) => void, updateDraft: (key: string, value: string | boolean) => void}}
+ */
 export function useSingleValueDraft(config) {
   const [target, setTarget] = useState(() => pick(config, TARGET_FIELDS));
+  const [write, setWrite] = useState(() => pick(config, WRITE_FIELDS));
   const [appearance, setAppearance] = useState(() => pick(config, APPEARANCE_FIELDS));
 
   const resetDraft = useCallback((nextConfig) => {
     setTarget(pick(nextConfig, TARGET_FIELDS));
+    setWrite(pick(nextConfig, WRITE_FIELDS));
     setAppearance(pick(nextConfig, APPEARANCE_FIELDS));
   }, []);
 
@@ -32,18 +41,24 @@ export function useSingleValueDraft(config) {
     if (TARGET_FIELDS.includes(key)) {
       setTarget((current) => ({ ...current, [key]: value }));
     }
+
+    if (WRITE_FIELDS.includes(key)) {
+      setWrite((current) => ({ ...current, [key]: value }));
+    }
+
     if (APPEARANCE_FIELDS.includes(key)) {
       setAppearance((current) => ({ ...current, [key]: value }));
     }
   }, []);
 
   return {
-    draft: { ...config, ...target, ...appearance },
+    draft: { ...config, ...target, ...write, ...appearance },
     resetDraft,
     updateDraft,
   };
 }
 
+/** Copies only one settings group, retaining the existing flat persistence format. */
 function pick(config, keys) {
   return Object.fromEntries(keys.map((key) => [key, config[key]]));
 }

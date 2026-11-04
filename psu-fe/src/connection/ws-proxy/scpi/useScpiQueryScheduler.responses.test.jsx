@@ -18,13 +18,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Probe, measurementDataBlockBase64 } from "./schedulerTestFixtures.jsx";
 
 describe("SCPI scheduler responses", () => {
-let api;
-let deviceState;
-let sendWsMessage;
-let wsConnectedRef;
-let nextRequestId;
-beforeEach(() => {
+  let api;
+  let deviceState;
+  let sendWsMessage;
+  let wsConnectedRef;
+  let nextRequestId;
+
+  beforeEach(() => {
     vi.useFakeTimers();
+
     api = { current: null };
     deviceState = {
       current: {
@@ -36,23 +38,131 @@ beforeEach(() => {
     nextRequestId = 0;
     sendWsMessage = vi.fn(() => `uuid-${(nextRequestId += 1)}`);
   });
-afterEach(() => {
+
+  afterEach(() => {
     cleanup();
     vi.useRealTimers();
   });
-it.each(["device", "proxy"])("discards stale requests and readings after %s disconnect", (target) => {
-    render(<Probe api={api} deviceState={deviceState} sendWsMessage={sendWsMessage}
-      wsConnectedRef={wsConnectedRef} />);
+
+  it("refreshes immediately, ignores superseded replies and continues polling", () => {
+    render(
+      <Probe
+        api={api}
+        deviceState={deviceState}
+        sendWsMessage={sendWsMessage}
+        wsConnectedRef={wsConnectedRef}
+      />,
+    );
+
     act(() => {
-      api.current.subscribeScpiQuery({ widgetId: "voltage", deviceName: "PSU1",
-        query: "MEAS:VOLT?", frequencyHz: 1 });
-      if (target === "device") deviceState.current.deviceStatuses[0].state = "DISCONNECTED";
-      else wsConnectedRef.current = false;
+      api.current.subscribeScpiQuery({
+        widgetId: "voltage",
+        deviceName: "PSU1",
+        query: "MEAS:VOLT?",
+        frequencyHz: 1,
+      });
+    });
+
+    // The refresh must send now, even though uuid-1 still owns a pending poll.
+    act(() => {
+      expect(api.current.refreshScpiQuery("PSU1", "MEAS:VOLT?")).toBe(true);
+      expect(api.current.handleScpiSchedulerMessage({
+        uuid: "uuid-1",
+        payload: "99",
+      })).toBe(false);
+
+      api.current.handleScpiSchedulerMessage({ uuid: "uuid-2", payload: "12" });
+
+      // A superseded reply must also be ignored if it arrives after the fresh one.
+      expect(api.current.handleScpiSchedulerMessage({
+        uuid: "uuid-1",
+        payload: "99",
+      })).toBe(false);
+    });
+
+    expect(api.current.getScpiQuerySnapshot("PSU1", "MEAS:VOLT?").value).toBe("12");
+    expect(sendWsMessage).toHaveBeenCalledTimes(2);
+
+    act(() => vi.advanceTimersByTime(1000));
+
+    expect(sendWsMessage).toHaveBeenCalledTimes(3);
+  });
+
+  it("reports refresh timeout and send failure without replacing the previous value", () => {
+    render(
+      <Probe
+        api={api}
+        deviceState={deviceState}
+        sendWsMessage={sendWsMessage}
+        wsConnectedRef={wsConnectedRef}
+      />,
+    );
+
+    act(() => {
+      api.current.subscribeScpiQuery({
+        widgetId: "voltage",
+        deviceName: "PSU1",
+        query: "MEAS:VOLT?",
+        frequencyHz: 0.1,
+      });
+      api.current.handleScpiSchedulerMessage({ uuid: "uuid-1", payload: "12" });
+    });
+
+    // Leave the explicit refresh unanswered to exercise its bounded wait.
+    act(() => {
+      api.current.refreshScpiQuery("PSU1", "MEAS:VOLT?");
+      vi.advanceTimersByTime(10000);
+    });
+
+    expect(api.current.getScpiQuerySnapshot("PSU1", "MEAS:VOLT?")).toMatchObject({
+      value: "12",
+      error: "SCPI refresh timed out.",
+      loading: false,
+    });
+
+    act(() => {
+      sendWsMessage.mockReturnValue(null);
+      expect(api.current.refreshScpiQuery("PSU1", "MEAS:VOLT?")).toBe(false);
+    });
+
+    expect(api.current.getScpiQuerySnapshot("PSU1", "MEAS:VOLT?").error)
+      .toBe("SCPI query could not be sent.");
+  });
+
+  it.each(["device", "proxy"])("discards stale requests and readings after %s disconnect", (target) => {
+    render(
+      <Probe
+        api={api}
+        deviceState={deviceState}
+        sendWsMessage={sendWsMessage}
+        wsConnectedRef={wsConnectedRef}
+      />,
+    );
+
+    act(() => {
+      api.current.subscribeScpiQuery({
+        widgetId: "voltage",
+        deviceName: "PSU1",
+        query: "MEAS:VOLT?",
+        frequencyHz: 1,
+      });
+
+      if (target === "device") {
+        deviceState.current.deviceStatuses[0].state = "DISCONNECTED";
+      } else {
+        wsConnectedRef.current = false;
+      }
+
       api.current.pollScpiQueries();
     });
+
     expect(api.current.getScpiQuerySnapshot("PSU1", "MEAS:VOLT?")).toMatchObject({
-      value: "", loading: false, updatedAt: 0, disconnected: true,
+      value: "",
+      loading: false,
+      updatedAt: 0,
+      disconnected: true,
     });
+
     act(() => {
       deviceState.current.deviceStatuses[0].state = "CONNECTED";
       wsConnectedRef.current = true;
@@ -60,29 +170,46 @@ it.each(["device", "proxy"])("discards stale requests and readings after %s disc
       expect(api.current.handleScpiSchedulerMessage({ uuid: "uuid-1", payload: "99" })).toBe(false);
       api.current.handleScpiSchedulerMessage({ uuid: "uuid-2", payload: "12" });
     });
+
     expect(sendWsMessage).toHaveBeenCalledTimes(2);
     expect(api.current.getScpiQuerySnapshot("PSU1", "MEAS:VOLT?").value).toBe("12");
   });
 
-it("reports scheduler errors for the target device without triggering on successful or unrelated responses", () => {
+  it("reports scheduler errors for the target device without triggering on successful or unrelated responses", () => {
     const onScpiError = vi.fn();
-    render(<Probe api={api} deviceState={deviceState} sendWsMessage={sendWsMessage}
-      wsConnectedRef={wsConnectedRef} onScpiError={onScpiError} />);
+
+    render(
+      <Probe
+        api={api}
+        deviceState={deviceState}
+        sendWsMessage={sendWsMessage}
+        wsConnectedRef={wsConnectedRef}
+        onScpiError={onScpiError}
+      />,
+    );
+
     act(() => {
-      api.current.subscribeScpiQuery({ widgetId: "voltage", deviceName: "PSU1",
-        query: "MEAS:VOLT?", frequencyHz: 1 });
+      api.current.subscribeScpiQuery({
+        widgetId: "voltage",
+        deviceName: "PSU1",
+        query: "MEAS:VOLT?",
+        frequencyHz: 1,
+      });
       api.current.handleScpiSchedulerMessage({ uuid: "uuid-1", payload: "12" });
       api.current.handleScpiSchedulerMessage({ uuid: "unrelated", payload: "ERR DISCONNECTED" });
     });
+
     expect(onScpiError).not.toHaveBeenCalled();
+
     act(() => {
       vi.advanceTimersByTime(1000);
       api.current.handleScpiSchedulerMessage({ uuid: "uuid-2", payload: "ERR CONNECTION_LOST USB removed" });
     });
+
     expect(onScpiError).toHaveBeenCalledExactlyOnceWith("PSU1", "ERR CONNECTION_LOST USB removed");
   });
 
-it("updates cache snapshots from scheduler responses and stores errors", () => {
+  it("updates cache snapshots from scheduler responses and stores errors", () => {
     render(
       <Probe
         api={api}
@@ -120,7 +247,7 @@ it("updates cache snapshots from scheduler responses and stores errors", () => {
     });
   });
 
-it("updates cache snapshots from binary DATA responses", () => {
+  it("updates cache snapshots from binary DATA responses", () => {
     vi.setSystemTime(5000);
     render(
       <Probe
@@ -158,7 +285,7 @@ it("updates cache snapshots from binary DATA responses", () => {
     });
   });
 
-it("notifies only listeners for the changed snapshot identity", () => {
+  it("notifies only listeners for the changed snapshot identity", () => {
     render(
       <Probe
         api={api}
