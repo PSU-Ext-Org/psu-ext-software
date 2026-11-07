@@ -16,7 +16,7 @@
   const interiorPointsPerRange = 5;
 
   const sourceOutput = "OUTP " + siglentChannel + ",";
-  const psuExtOutput = "OUTP " + psuExtChannel + ",";
+  const psuExtOutput = "OUTP CH1, ";
 
   function roundedMillivolts(voltage) {
     return Math.round(voltage * 1000) / 1000;

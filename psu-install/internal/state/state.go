@@ -69,7 +69,17 @@ func EnsureLayout(home string) error {
 	}
 	devices := filepath.Join(home, "data", "devices.json")
 	if _, err := os.Stat(devices); os.IsNotExist(err) {
-		return os.WriteFile(devices, []byte("[]\n"), 0600)
+		return os.WriteFile(devices, []byte(`[
+  {
+    "id": 0,
+    "name": "PSUEXT1",
+    "type": "USB",
+    "ip": null,
+    "port": "COM5",
+    "baudrate": 9600
+  }
+]
+`), 0600)
 	}
 	return nil
 }

@@ -1,59 +1,116 @@
 (() => {
-  // Change these values for the three connected Script Runner devices.
   const siglentDeviceId = "SPD4323X";
   const rigolDeviceId = "DM858E";
   const psuExtDeviceId = "PSUEXT1";
   const siglentChannel = "CH2";
   const psuExtChannel = "CH1";
 
-  // The Siglent powers the calibration circuit. Adjust its voltage or the
-  // external load manually to reach the target current at each prompt.
-  //
-  // The Rigol reading, rather than the requested target, is stored in the
-  // calibration point. This keeps the calibration tied to the measured value.
-  const sourceCurrentLimitAmps = 2.2;
+  // Configure the PSU-EXT response timeout in Script Runner to >= 35 seconds.
+  const sourceCurrentLimitAmps = 2.5;
   const enablePsuExtOutput = true;
   const outputEnableSettlingMilliseconds = 5000;
   const measurementSettlingMilliseconds = 2000;
   const operatorInputTimeoutMilliseconds = 5 * 60 * 1000;
 
-  // These eight points must match the PSU-EXT current-calibration protocol.
   const calibrationTargetCurrentsAmps = [
-    0, 0.0030, 0.0050, 0.0100, 0.0500, 0.1000, 0.250, 0.500
+    0, 0.0010, 0.0030, 0.0050, 0.0100, 0.0500, 0.1000,
+    0.250, 0.500, 0.700, 1, 1.5, 2, 2.4
   ];
 
   if (psuExtChannel !== "CH1") {
     throw new Error("PSU-EXT current calibration supports only CH1");
   }
 
-  if (calibrationTargetCurrentsAmps.length !== 8) {
-    throw new Error("PSU-EXT current calibration requires exactly eight points");
-  }
-
   const sourceOutput = "OUTP " + siglentChannel + ",";
   const psuExtOutput = "OUTP " + psuExtChannel + ",";
+  const expectedTransaction = "OPEN,CURRENT,CH1";
+
   let calibrationTransactionOpen = false;
   let previousActualCurrentAmps = -1;
-  let previousCapturedRawValue = -1;
   let completedPoints = 0;
+
+  function readPsuExt(command) {
+    const response = String(queryRaw(psuExtDeviceId, command)).trim();
+
+    if (/^ERR\b/i.test(response)) {
+      throw new Error("PSU-EXT error while confirming " + command + ": " + response);
+    }
+
+    return response;
+  }
+
+  function requireTransaction(expected) {
+    const response = readPsuExt("CALibration:TRANsaction?");
+
+    if (response !== expected) {
+      throw new Error(
+        "Expected PSU-EXT transaction " + expected + ", received: " + response
+      );
+    }
+  }
+
+  function confirmPoint(pointIndex, expectedCurrentAmps) {
+    // The firmware processes this query after the preceding capture command.
+    // Reply format: raw ADC voltage, stored reference current, PGA full scale.
+    const command = "CALibration:CURRent? CH1,POINt" + pointIndex;
+    const response = readPsuExt(command);
+    const fields = response.split(",").map(value => value.trim());
+
+    if (
+      fields.length !== 3 ||
+      fields.some(value => value === "" || !Number.isFinite(Number(value)))
+    ) {
+      throw new Error(
+        "Invalid readback for point " + pointIndex + ": " + response
+      );
+    }
+
+    const rawVoltage = Number(fields[0]);
+    const storedCurrentAmps = Number(fields[1]);
+    const pgaFullScaleVolts = Number(fields[2]);
+
+    // Compare in the firmware's 0.0001 A reference units.
+    if (
+      storedCurrentAmps < 0 ||
+      Math.round(storedCurrentAmps * 10000) !==
+        Math.round(expectedCurrentAmps * 10000) ||
+      pgaFullScaleVolts <= 0
+    ) {
+      throw new Error(
+        "Point " + pointIndex + " confirmation failed: expected " +
+        expectedCurrentAmps.toFixed(4) + " A, received: " + response
+      );
+    }
+
+    log(
+      "INFO",
+      "Confirmed point " + pointIndex +
+        ": stored " + storedCurrentAmps.toFixed(4) +
+        " A, raw " + rawVoltage.toFixed(6) +
+        " V, PGA ±" + pgaFullScaleVolts.toFixed(3) + " V"
+    );
+  }
 
   try {
     write(siglentDeviceId, sourceOutput + "0");
+
     log("INFO", "Siglent: " + queryRaw(siglentDeviceId, "*IDN?"));
     log("INFO", "Rigol: " + queryRaw(rigolDeviceId, "*IDN?"));
-    log("INFO", "PSU-EXT: " + queryRaw(psuExtDeviceId, "*IDN?"));
+    log("INFO", "PSU-EXT: " + readPsuExt("*IDN?"));
 
     write(rigolDeviceId, "CONF:CURR:DC");
     write(rigolDeviceId, "SENS:CURR:DC:RANG:AUTO ON");
-    write(siglentDeviceId, "SOUR:CURR " + siglentChannel + "," + sourceCurrentLimitAmps);
+    write(
+      siglentDeviceId,
+      "SOUR:CURR " + siglentChannel + "," + sourceCurrentLimitAmps
+    );
 
-    // A previous interrupted run leaves a transaction open; close it before
-    // starting a new one so its captured values cannot be reused accidentally.
-    const existingTransaction = queryRaw(psuExtDeviceId, "CALibration:TRANsaction?");
+    const existingTransaction = readPsuExt("CALibration:TRANsaction?");
 
     if (existingTransaction !== "IDLE") {
-      log("WARN", "Aborting unfinished PSU-EXT calibration: " + existingTransaction);
+      log("WARN", "Aborting unfinished calibration: " + existingTransaction);
       write(psuExtDeviceId, "CALibration:ABORt");
+      requireTransaction("IDLE");
     }
 
     if (enablePsuExtOutput) {
@@ -62,40 +119,30 @@
 
     write(psuExtDeviceId, "CALibration:STARt CURRent,CH1");
     calibrationTransactionOpen = true;
+    requireTransaction(expectedTransaction);
 
-    const expectedTransaction = "OPEN,CURRENT,CH1";
-    const startAcknowledgement = queryRaw(psuExtDeviceId, "CALibration:TRANsaction?");
-
-    if (startAcknowledgement !== expectedTransaction) {
-      throw new Error(
-        "PSU-EXT did not acknowledge " + expectedTransaction + ": " + startAcknowledgement
-      );
-    }
-
-    // Apply power only after PSU-EXT has accepted the calibration transaction.
     write(siglentDeviceId, sourceOutput + "1");
     sleep(outputEnableSettlingMilliseconds);
 
     for (let index = 0; index < calibrationTargetCurrentsAmps.length; index += 1) {
       if (cancelled()) {
-        return { cancelled: true, completedPoints: index };
+        return { cancelled: true, completedPoints };
       }
 
       const targetCurrentAmps = calibrationTargetCurrentsAmps[index];
       const targetCurrentMilliamps = targetCurrentAmps * 1000;
 
-      // Empty input continues with this point. Entering 0 commits only the
-      // points already captured and skips all remaining target points.
       const operatorResponse = input(
         "Set the target current to " + targetCurrentMilliamps +
-          " mA. Press Enter when the Rigol reading is stable, or enter 0 to commit now " +
-          "(5-minute timeout).",
+          " mA. Press Enter when the Rigol reading is stable, or enter 0 " +
+          "to commit the confirmed points (5-minute timeout).",
         operatorInputTimeoutMilliseconds
       );
+
       if (operatorResponse === 0) {
         log(
           "INFO",
-          "Committing current calibration after " + completedPoints + " captured point(s)."
+          "Committing after " + completedPoints + " confirmed point(s)."
         );
         break;
       }
@@ -105,73 +152,67 @@
       const rigolCurrentAmps = query(rigolDeviceId, "READ?");
 
       if (!Number.isFinite(rigolCurrentAmps)) {
-        throw new Error("Rigol returned an invalid current at target " + targetCurrentAmps + " A");
+        throw new Error(
+          "Rigol returned an invalid current at target " + targetCurrentAmps + " A"
+        );
       }
 
-      const actualCurrentAmps = rigolCurrentAmps < 0 ? 0 : rigolCurrentAmps;
+      const calibrationCurrentAmps = Number(rigolCurrentAmps.toFixed(4));
 
-      if (rigolCurrentAmps < 0) {
-        log("WARN", "Rigol returned negative current; using 0 A for calibration");
+      // Permit tiny negative zero readings that round to zero, as in the
+      // supplied script, but reject values that remain negative after rounding.
+      if (calibrationCurrentAmps < 0) {
+        throw new Error(
+          "Rigol current is negative: " + rigolCurrentAmps + " A"
+        );
       }
-
-      // PSU-EXT accepts values at 0.1 mA resolution. Strict ordering protects
-      // both the measured-current table and the ADC raw-value table.
-      const calibrationCurrentAmps = Number(actualCurrentAmps.toFixed(4));
 
       if (calibrationCurrentAmps <= previousActualCurrentAmps) {
         throw new Error(
           "Rigol current must increase at every calibration point; target " +
-            targetCurrentAmps + " A measured " + calibrationCurrentAmps + " A after " +
-            previousActualCurrentAmps + " A"
+            targetCurrentAmps + " A measured " + calibrationCurrentAmps +
+            " A after " + previousActualCurrentAmps + " A"
         );
       }
 
-      write(
-        psuExtDeviceId,
-        "CALibration:CURRent CH1,POINt" + (index + 1) + "," + calibrationCurrentAmps.toFixed(4)
+      const pointIndex = completedPoints + 1;
+
+      log(
+        "INFO",
+        "Capturing point " + pointIndex + ": " +
+          calibrationCurrentAmps.toFixed(4) + " A; waiting for confirmation."
       );
 
-      const capturedPoint = queryRaw(
-        psuExtDeviceId,
-        "CALibration:CURRent? CH1,POINt" + (index + 1)
-      );
-      const capturedValues = capturedPoint.split(",");
-      const capturedRawValue = Number(capturedValues[0]);
-      const capturedActualCurrentAmps = Number(capturedValues[1]);
+      try {
+        write(
+          psuExtDeviceId,
+          "CALibration:CURRent CH1,POINt" + pointIndex + "," +
+            calibrationCurrentAmps.toFixed(4)
+        );
 
-      if (capturedValues.length !== 2 || !Number.isFinite(capturedRawValue)
-          || !Number.isFinite(capturedActualCurrentAmps)) {
-        throw new Error("PSU-EXT returned an invalid captured point: " + capturedPoint);
+        // Do not update progress or ask for the next point until readback agrees.
+        confirmPoint(pointIndex, calibrationCurrentAmps);
+      } catch (error) {
+        throw new Error(
+          "Point " + pointIndex + " at target " + targetCurrentMilliamps +
+            " mA was not confirmed: " + error
+        );
       }
 
-      if (capturedRawValue <= previousCapturedRawValue
-          || capturedActualCurrentAmps <= previousActualCurrentAmps) {
-        throw new Error("PSU-EXT calibration points must increase strictly; captured " + capturedPoint);
-      }
-
-      previousActualCurrentAmps = capturedActualCurrentAmps;
-      previousCapturedRawValue = capturedRawValue;
+      previousActualCurrentAmps = calibrationCurrentAmps;
       completedPoints += 1;
 
       record(new Date(), "calibration-current", "A", rigolCurrentAmps);
       log(
         "INFO",
-        "Point " + (index + 1) + ": target " + targetCurrentMilliamps +
-          " mA, Rigol " + rigolCurrentAmps +
-          " A, calibration value " + calibrationCurrentAmps.toFixed(4) + " A"
+        "Point " + pointIndex + " completed: target " +
+          targetCurrentMilliamps + " mA, Rigol " + rigolCurrentAmps + " A"
       );
       progress((index + 1) / calibrationTargetCurrentsAmps.length);
     }
 
-    // COMMit makes the captured table persistent; an open transaction is
-    // otherwise aborted by the cleanup block below.
     write(psuExtDeviceId, "CALibration:COMMit");
-
-    const committedTransaction = queryRaw(psuExtDeviceId, "CALibration:TRANsaction?");
-
-    if (committedTransaction !== "IDLE") {
-      throw new Error("PSU-EXT did not complete current calibration: " + committedTransaction);
-    }
+    requireTransaction("IDLE");
 
     calibrationTransactionOpen = false;
     log("INFO", "Current calibration committed for CH1");
@@ -182,24 +223,28 @@
       targetCurrentsAmps: calibrationTargetCurrentsAmps
     };
   } finally {
-    // Never leave either output enabled, including after cancellation, timeout,
-    // or a rejected calibration point.
-    if (calibrationTransactionOpen) {
+    // Attempt each output shutdown independently, before transaction cleanup.
+    try {
+      write(siglentDeviceId, sourceOutput + "0");
+    } catch (error) {
+      log("ERROR", "Could not switch Siglent output off: " + error);
+    }
+
+    if (enablePsuExtOutput) {
       try {
-        write(psuExtDeviceId, "CALibration:ABORt");
+        write(psuExtDeviceId, psuExtOutput + "0");
       } catch (error) {
-        log("ERROR", "Could not abort unfinished calibration: " + error);
+        log("ERROR", "Could not switch PSU-EXT output off: " + error);
       }
     }
 
-    try {
-      write(siglentDeviceId, sourceOutput + "0");
-
-      if (enablePsuExtOutput) {
-        write(psuExtDeviceId, psuExtOutput + "0");
+    if (calibrationTransactionOpen) {
+      try {
+        write(psuExtDeviceId, "CALibration:ABORt");
+        requireTransaction("IDLE");
+      } catch (error) {
+        log("ERROR", "Could not confirm calibration abort: " + error);
       }
-    } catch (error) {
-      log("ERROR", "Could not switch calibration outputs off: " + error);
     }
   }
 })();

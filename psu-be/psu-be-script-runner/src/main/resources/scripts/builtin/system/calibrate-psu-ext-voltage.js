@@ -11,22 +11,14 @@
   const enablePsuExtOutput = true;
 
   const currentLimitAmps = 0.10;
-  const outputEnableSettlingMilliseconds = 20000;
+  const outputEnableSettlingMilliseconds = 5000;
   const settleMilliseconds = 5000;
   const maximumReferenceDeviationVolts = 0.05;
-  const calibrationPointsVolts = [0, 0.1, 0.25, 0.5, 3, 5, 12, 24];
+  const calibrationPointsVolts = [0, 0.003, 0.005, 0.010, 0.025,0.1,0.5,1,1.5,3,5,7,8,10,12,16,18,24];
 
-  if (
-    calibrationPointsVolts.length < 2 ||
-    calibrationPointsVolts.length > 8
-  ) {
-    throw new Error(
-      "PSU-EXT voltage calibration requires two to eight points"
-    );
-  }
 
   const sourceOutput = "OUTP " + siglentChannel + ",";
-  const psuExtOutput = "OUTP " + psuExtChannel + ",";
+  const psuExtOutput = "OUTP CH1,";
 
   let calibrationTransactionOpen = false;
 
