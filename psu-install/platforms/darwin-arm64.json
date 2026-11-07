@@ -1,6 +1,6 @@
 {
   "platform": "darwin-arm64",
-  "runner": "macos-14",
+  "runner": "macos-15",
   "assemble": "bash psu-install/scripts/assemble-macos.sh \"$PSU_EXT_RELEASE_VERSION\"",
   "checkBootstrap": "sh -n psu-install/install-macos.sh",
   "installer": "psu-ext-darwin-arm64",

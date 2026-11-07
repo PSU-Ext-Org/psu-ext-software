@@ -75,6 +75,11 @@ up to three times at Task Scheduler's minimum one-minute interval.
 
 ## Installed layout
 
+The frontend application dashboards are preconfigured for the `PSUEXT1` device name.
+New installations include this device in `data/devices.json` with a USB connection
+on `COM5` at 9600 baud. Adjust the port for your system in the device settings.
+Existing device configurations are preserved.
+
 ```text
 ~/.psu-ext/
 ├── config/                  # Generated Spring, frontend, and Caddy configuration
