@@ -4,10 +4,15 @@
 package release_test
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
+	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/PSU-Ext-Org/psu-ext-software/psu-install/internal/release"
@@ -28,8 +33,40 @@ func TestDownloadVerifiedRejectsChecksumMismatchAndHTTPError(t *testing.T) {
 			}))
 			defer server.Close()
 			target := filepath.Join(t.TempDir(), "bundle.zip")
-			if err := release.DownloadVerified(context.Background(), server.Client(), server.URL, target, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"); err == nil {
+			if err := release.DownloadVerified(context.Background(), server.Client(), server.URL, target, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", io.Discard); err == nil {
 				t.Fatal("expected download error")
+			}
+		})
+	}
+}
+
+// TestDownloadProgress covers both fixed-length and streamed HTTP responses.
+func TestDownloadProgress(t *testing.T) {
+	const body = "test bundle"
+	for _, test := range []struct {
+		name string
+		want string
+	}{
+		{name: "known length", want: "(100.0%)"},
+		{name: "unknown length", want: "(11 bytes)"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, _ *http.Request) {
+				if test.name == "unknown length" {
+					response.(http.Flusher).Flush()
+				}
+				fmt.Fprint(response, body)
+			}))
+			defer server.Close()
+
+			var output bytes.Buffer
+			target := filepath.Join(t.TempDir(), "bundle.zip")
+			checksum := fmt.Sprintf("%x", sha256.Sum256([]byte(body)))
+			if err := release.DownloadVerified(context.Background(), server.Client(), server.URL, target, checksum, &output); err != nil {
+				t.Fatal(err)
+			}
+			if !strings.Contains(output.String(), test.want+"\nVerifying bundle checksum...") {
+				t.Fatalf("unexpected download output %q", output.String())
 			}
 		})
 	}

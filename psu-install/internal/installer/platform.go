@@ -12,7 +12,9 @@ import (
 	"github.com/PSU-Ext-Org/psu-ext-software/psu-install/internal/release"
 )
 
+// serviceAdapter groups lifecycle operations for the platform's service manager.
 type serviceAdapter struct {
+	uninstall       func(ctx context.Context, output io.Writer, home string) error
 	install         func(home string) error
 	command         func(ctx context.Context, output io.Writer, command string) error
 	commandWithHome func(ctx context.Context, output io.Writer, home, command string) error

@@ -18,9 +18,10 @@ func init() {
 		return
 	}
 	registerUnixPlatform("linux-amd64", serviceAdapter{
-		install: installSystemdServices,
-		command: commandSystemdServices,
-		logs:    systemdLogs,
+		uninstall: systemd.Uninstall,
+		install:   installSystemdServices,
+		command:   commandSystemdServices,
+		logs:      systemdLogs,
 	})
 }
 

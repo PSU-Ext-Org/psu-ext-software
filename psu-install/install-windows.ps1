@@ -36,9 +36,14 @@ try {
     $checksumsPath = Join-Path $temporaryDirectory "checksums.txt"
 
     Write-Host "Downloading the Windows x64 CLI: $binary"
-    Invoke-WebRequest -UseBasicParsing -Uri "$baseUrl/$binary" -OutFile $binaryPath
+    & curl.exe --fail --location "$baseUrl/$binary" --output $binaryPath
+    if ($LASTEXITCODE -ne 0) {
+        throw "psu-ext: CLI download failed (curl exit code $LASTEXITCODE)"
+    }
+    Write-Host "Downloading release checksums"
     Invoke-WebRequest -UseBasicParsing -Uri "$baseUrl/checksums.txt" -OutFile $checksumsPath
 
+    Write-Host "Verifying CLI checksum"
     $escapedBinary = [regex]::Escape($binary)
     $checksumLine = Get-Content -LiteralPath $checksumsPath |
         Where-Object { $_ -match "^([0-9a-fA-F]{64})\s+\*?$escapedBinary$" } |
@@ -53,6 +58,7 @@ try {
     }
 
     $target = Join-Path $targetDirectory "psu-ext.exe"
+    Write-Host "Installing CLI in $targetDirectory"
     Copy-Item -Force -LiteralPath $binaryPath -Destination $target
     Write-Host "Installed $target"
     Write-Host "Ensure $targetDirectory is on PATH, then run: psu-ext install"

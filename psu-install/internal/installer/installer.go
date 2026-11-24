@@ -73,6 +73,7 @@ func (m *Manager) Install(ctx context.Context, version string) error {
 	if tag == "" {
 		tag = "latest"
 	}
+	fmt.Fprintf(m.stdout, "Checking the %s release for %s...\n", tag, m.platform)
 	manifest, err := release.FetchManifest(ctx, m.client, m.releaseURL(tag, "release-manifest.json"), m.platform)
 	if err != nil {
 		return err
@@ -82,15 +83,18 @@ func (m *Manager) Install(ctx context.Context, version string) error {
 		return err
 	}
 	current.Version = manifest.Version
+	fmt.Fprintf(m.stdout, "Writing installation state and configuration in %s...\n", m.home)
 	if err := state.Save(statePath, current); err != nil {
 		return err
 	}
 	if err := appconfig.Write(m.home, releaseDir, current); err != nil {
 		return err
 	}
+	fmt.Fprintf(m.stdout, "Activating PSU-EXT %s...\n", manifest.Version)
 	if err := activateRelease(m.home, releaseDir); err != nil {
 		return err
 	}
+	fmt.Fprintln(m.stdout, "Registering PSU-EXT services...")
 	if err := installServices(m.home); err != nil {
 		return err
 	}
@@ -126,19 +130,27 @@ func loadOrCreateState(path string) (state.State, error) {
 	return current, err
 }
 
+// downloadRelease prepares a new bundle or validates an existing version on disk.
 func (m *Manager) downloadRelease(ctx context.Context, tag string, manifest release.Manifest) (string, error) {
 	asset := manifest.Assets[m.platform]
 	releaseDir := filepath.Join(m.home, "releases", manifest.Version)
 	if _, err := os.Stat(releaseDir); os.IsNotExist(err) {
 		archive := filepath.Join(m.home, "releases", asset.Name)
-		if err := release.DownloadVerified(ctx, m.client, m.releaseURL(tag, asset.Name), archive, asset.SHA256); err != nil {
+		fmt.Fprintf(m.stdout, "Downloading PSU-EXT %s (%s)...\n", manifest.Version, asset.Name)
+		if err := release.DownloadVerified(ctx, m.client, m.releaseURL(tag, asset.Name), archive, asset.SHA256, m.stdout); err != nil {
 			return "", err
 		}
+		fmt.Fprintln(m.stdout, "Extracting application bundle...")
 		if err := extractRelease(archive, releaseDir); err != nil {
 			return "", err
 		}
 		_ = os.Remove(archive)
+	} else if err != nil {
+		return "", err
+	} else {
+		fmt.Fprintf(m.stdout, "Using existing bundle for PSU-EXT %s...\n", manifest.Version)
 	}
+	fmt.Fprintln(m.stdout, "Checking extracted application files...")
 	if err := validateRelease(releaseDir); err != nil {
 		return "", err
 	}

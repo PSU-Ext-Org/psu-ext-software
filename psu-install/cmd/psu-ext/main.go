@@ -20,7 +20,7 @@ func main() {
 
 func run(args []string) error {
 	if len(args) == 0 {
-		return fmt.Errorf("usage: psu-ext <install|start|stop|restart|status|logs|update>")
+		return fmt.Errorf("usage: psu-ext <install|start|stop|restart|status|logs|update|uninstall>")
 	}
 
 	manager, err := installer.NewManager()
@@ -29,6 +29,11 @@ func run(args []string) error {
 	}
 	ctx := context.Background()
 	switch args[0] {
+	case "uninstall":
+		if len(args) != 1 {
+			return fmt.Errorf("usage: psu-ext uninstall")
+		}
+		return manager.Uninstall(ctx, os.Stdin)
 	case "install":
 		version := ""
 		if len(args) == 3 && args[1] == "--version" {
