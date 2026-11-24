@@ -21,6 +21,7 @@ func init() {
 	registerPlatform(platformAdapter{
 		key: "windows-amd64",
 		services: serviceAdapter{
+			uninstall:       taskscheduler.Uninstall,
 			install:         installScheduledTasks,
 			commandWithHome: commandScheduledTasks,
 			logs:            scheduledTaskLogs,

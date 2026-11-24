@@ -64,6 +64,7 @@ psu-ext restart
 psu-ext status
 psu-ext logs [proxy|runner|caddy]
 psu-ext update
+psu-ext uninstall
 ```
 
 `install` registers user-level systemd units, macOS launch agents, or Windows
@@ -72,6 +73,20 @@ latest release while preserving device profiles, scripts, results, ports, and
 other user data. On Windows, Task Scheduler ends processes directly, so
 `psu-ext stop` interrupts any active script task. Failed Windows tasks restart
 up to three times at Task Scheduler's minimum one-minute interval.
+
+`psu-ext uninstall` displays the installation directory and asks you to type
+`UNINSTALL`. Back up device profiles, script definitions, and script results
+outside that directory before confirming. Confirmation stops the services,
+interrupts running scripts, unregisters the services, and deletes the installed
+releases, configuration, application logs, and PSU-EXT data. The command then
+prints a shell command to remove the CLI executable manually. Entering another
+response or closing the input cancels the uninstall.
+
+If you set `PSU_EXT_HOME` during installation, use the same value for uninstall.
+Check the displayed path before confirming. Your device profiles are in
+`data/devices.json`, scripts in `data/script-definitions/`, and results in
+`data/script-storage/`. If service removal fails, the command reports the error
+and keeps the application data so you can resolve the problem and retry.
 
 ## Installed layout
 
@@ -128,6 +143,10 @@ go build ./cmd/psu-ext
 ```
 
 The root CI workflow checks formatting and runs all Go tests from this module.
+
+Set `PSU_EXT_TEST_NATIVE_SERVICES=1` when running the tests to exercise the
+local service manager. The Linux and macOS tests use unique service names.
+The Windows test uses a disposable Task Scheduler folder.
 
 ## Release assembly
 

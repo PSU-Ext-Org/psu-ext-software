@@ -16,8 +16,9 @@ func init() {
 		return
 	}
 	registerUnixPlatform("darwin-arm64", serviceAdapter{
-		install: launchd.Install,
-		command: launchd.Command,
-		logs:    launchd.Logs,
+		uninstall: launchd.Uninstall,
+		install:   launchd.Install,
+		command:   launchd.Command,
+		logs:      launchd.Logs,
 	})
 }
