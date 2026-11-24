@@ -54,6 +54,12 @@ psu-ext start
 `psu-ext start` prints the local browser URL. Services and Caddy bind to
 loopback interfaces only.
 
+The bootstrap scripts show the CLI download and checksum verification.
+`psu-ext install` and `psu-ext update` report bundle download progress in MiB,
+with a percentage when the server supplies the download size. They also show
+when the installer is extracting the bundle, writing configuration, and
+registering services.
+
 ## Commands
 
 ```text
@@ -79,7 +85,8 @@ up to three times at Task Scheduler's minimum one-minute interval.
 outside that directory before confirming. Confirmation stops the services,
 interrupts running scripts, unregisters the services, and deletes the installed
 releases, configuration, application logs, and PSU-EXT data. The command then
-prints a shell command to remove the CLI executable manually. Entering another
+prints a shell command to remove the CLI executable manually, with separate
+commands for Command Prompt and PowerShell on Windows. Entering another
 response or closing the input cancels the uninstall.
 
 If you set `PSU_EXT_HOME` during installation, use the same value for uninstall.

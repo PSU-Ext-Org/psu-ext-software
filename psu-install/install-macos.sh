@@ -21,9 +21,11 @@ trap 'rm -rf "$temporary_dir"' EXIT
 mkdir -p "$target_dir"
 
 echo "Downloading the Apple Silicon macOS CLI: $binary"
-curl --fail --location --silent --show-error "$base_url/$binary" --output "$temporary_dir/$binary"
+curl --fail --location "$base_url/$binary" --output "$temporary_dir/$binary"
+echo "Downloading release checksums"
 curl --fail --location --silent --show-error "$base_url/checksums.txt" --output "$temporary_dir/checksums.txt"
 
+echo "Verifying CLI checksum"
 expected="$(awk -v name="$binary" '$2 == name {print $1}' "$temporary_dir/checksums.txt")"
 if [ -z "$expected" ]; then
     echo "psu-ext: checksums.txt has no entry for $binary" >&2
@@ -35,6 +37,7 @@ if [ "$actual" != "$expected" ]; then
     exit 1
 fi
 
+echo "Installing CLI in $target_dir"
 install -m 0755 "$temporary_dir/$binary" "$target_dir/psu-ext"
 echo "Installed $target_dir/psu-ext"
 echo "Ensure $target_dir is on PATH, then run: psu-ext install"

@@ -142,42 +142,70 @@ func writeUninstallFixture(t *testing.T, home string) {
 	}
 }
 
-// TestManualRemovalQuoting verifies paths containing spaces and apostrophes.
+// TestManualRemovalQuoting verifies the instructions shown on each platform.
 func TestManualRemovalQuoting(t *testing.T) {
 	path := "/a b/c'd"
-	commands := map[string]string{
-		"linux-amd64":   "rm -- '/a b/c'\\''d'",
-		"darwin-arm64":  "rm -- '/a b/c'\\''d'",
-		"windows-amd64": "Remove-Item -LiteralPath '/a b/c''d'",
+	for _, platform := range []string{"linux-amd64", "darwin-arm64"} {
+		var output bytes.Buffer
+		if err := printRemovalInstructions(&output, platform, path); err != nil {
+			t.Fatal(err)
+		}
+		if !strings.HasSuffix(output.String(), "rm -- '/a b/c'\\''d'\n") {
+			t.Fatalf("%s instructions: %q", platform, output.String())
+		}
 	}
-	for platform, want := range commands {
-		if got := deleteCommand(platform, path); got != want {
-			t.Errorf("%s: %s", platform, got)
+
+	var output bytes.Buffer
+	if err := printRemovalInstructions(&output, "windows-amd64", path); err != nil {
+		t.Fatal(err)
+	}
+	want := "Command Prompt (CMD)\ndel /f /q \"/a b/c'd\"\nPowerShell\nRemove-Item -LiteralPath '/a b/c''d'\n"
+	if !strings.HasSuffix(output.String(), want) {
+		t.Fatalf("Windows instructions: %q", output.String())
+	}
+}
+
+// TestManualRemovalCommand runs each printed command on a disposable executable path.
+func TestManualRemovalCommand(t *testing.T) {
+	dir := "PSU's test [1]"
+	t.Run("spaces and apostrophe", func(t *testing.T) { verifyManualRemovalCommands(t, dir) })
+	if runtime.GOOS == "windows" {
+		t.Run("CMD metacharacters", func(t *testing.T) { verifyManualRemovalCommands(t, dir+" %PATH%!") })
+	}
+}
+
+// verifyManualRemovalCommands checks actual deletion for every available shell.
+func verifyManualRemovalCommands(t *testing.T, directory string) {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), directory, "psu-ext")
+	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, command := range removalCommands(runtime.GOOS+"-"+runtime.GOARCH, path) {
+		if err := os.WriteFile(path, nil, 0700); err != nil {
+			t.Fatal(err)
+		}
+		shell := manualRemovalShell(command)
+		if output, err := shell.CombinedOutput(); err != nil {
+			t.Fatalf("%s manual removal: %v: %s", command.shell, err, output)
+		}
+		if _, err := os.Stat(path); !errors.Is(err, os.ErrNotExist) {
+			t.Fatalf("%s CLI survived manual removal: %v", command.shell, err)
 		}
 	}
 }
 
-// TestManualRemovalCommand runs the printed command on a disposable executable path.
-func TestManualRemovalCommand(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "PSU's test [1]", "psu-ext")
-	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(path, nil, 0700); err != nil {
-		t.Fatal(err)
-	}
-
-	command := deleteCommand(runtime.GOOS+"-"+runtime.GOARCH, path)
-	var shell *exec.Cmd
-	if runtime.GOOS == "windows" {
-		shell = exec.Command("powershell.exe", "-NoProfile", "-NonInteractive", "-Command", command)
-	} else {
-		shell = exec.Command("sh", "-c", command)
-	}
-	if output, err := shell.CombinedOutput(); err != nil {
-		t.Fatalf("manual removal: %v: %s", err, output)
-	}
-	if _, err := os.Stat(path); !errors.Is(err, os.ErrNotExist) {
-		t.Fatalf("expected CLI removed, got %v", err)
+// manualRemovalShell passes CMD the same text a user would paste into its prompt.
+func manualRemovalShell(command removalCommand) *exec.Cmd {
+	switch command.shell {
+	case "Command Prompt (CMD)":
+		shell := exec.Command("cmd.exe", "/d", "/q", "/v:on")
+		shell.Stdin = strings.NewReader(command.text + "\r\nexit\r\n")
+		return shell
+	case "PowerShell":
+		return exec.Command("powershell.exe", "-NoProfile", "-NonInteractive", "-Command", command.text)
+	default:
+		return exec.Command("sh", "-c", command.text)
 	}
 }

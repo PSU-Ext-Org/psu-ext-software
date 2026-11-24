@@ -19,12 +19,18 @@ package installer
 import (
 	"bufio"
 	"context"
+	"encoding/base64"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
+	"syscall"
+	"time"
+	"unicode/utf16"
 )
 
 // managedEntries lists installation-owned paths in removal order, with state last.
@@ -41,12 +47,54 @@ func inside(parent, path string) bool {
 	return err == nil && (rel == "." || filepath.IsLocal(rel))
 }
 
-// deleteCommand quotes the executable path for the platform's shell.
-func deleteCommand(platform, exe string) string {
+// removalCommand pairs a shell with the command that removes the CLI.
+type removalCommand struct {
+	shell string
+	text  string
+}
+
+// removalCommands quotes the executable path for each supported shell.
+func removalCommands(platform, exe string) []removalCommand {
 	if platform == "windows-amd64" {
-		return "Remove-Item -LiteralPath '" + strings.ReplaceAll(exe, "'", "''") + "'"
+		powerShell := "Remove-Item -LiteralPath '" + strings.ReplaceAll(exe, "'", "''") + "'"
+		return []removalCommand{
+			{shell: "Command Prompt (CMD)", text: cmdRemovalCommand(exe, powerShell)},
+			{shell: "PowerShell", text: powerShell},
+		}
 	}
-	return "rm -- '" + strings.ReplaceAll(exe, "'", "'\\''") + "'"
+	return []removalCommand{{text: "rm -- '" + strings.ReplaceAll(exe, "'", "'\\''") + "'"}}
+}
+
+// cmdRemovalCommand protects paths that CMD could expand as environment variables.
+func cmdRemovalCommand(exe, powerShell string) string {
+	if !strings.ContainsAny(exe, "%!") {
+		return `del /f /q "` + exe + `"`
+	}
+
+	// PowerShell accepts UTF-16LE encoded commands with no CMD metacharacters.
+	var encoded []byte
+	for _, unit := range utf16.Encode([]rune(powerShell)) {
+		encoded = binary.LittleEndian.AppendUint16(encoded, unit)
+	}
+	return "powershell.exe -NoProfile -NonInteractive -EncodedCommand " + base64.StdEncoding.EncodeToString(encoded)
+}
+
+// printRemovalInstructions displays commands after the application has been removed.
+func printRemovalInstructions(output io.Writer, platform, exe string) error {
+	if _, err := fmt.Fprintln(output, "PSU-EXT uninstalled. To remove the CLI executable, use the command for your shell."); err != nil {
+		return err
+	}
+	for _, command := range removalCommands(platform, exe) {
+		if command.shell != "" {
+			if _, err := fmt.Fprintln(output, command.shell); err != nil {
+				return err
+			}
+		}
+		if _, err := fmt.Fprintln(output, command.text); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // Uninstall removes this user's installation after explicit confirmation.
@@ -83,13 +131,12 @@ func (m *Manager) Uninstall(ctx context.Context, input io.Reader) error {
 		return fmt.Errorf("remove PSU-EXT services: %w", err)
 	}
 	if root != nil {
-		if err := removeInstallation(root, target.home, entries); err != nil {
+		if err := removeInstallation(ctx, m.stdout, root, target.home, entries); err != nil {
 			return err
 		}
 	}
 
-	_, err = fmt.Fprintf(m.stdout, "PSU-EXT uninstalled. To remove the CLI executable, run:\n%s\n", deleteCommand(m.platform, exe))
-	return err
+	return printRemovalInstructions(m.stdout, m.platform, exe)
 }
 
 // installation holds the resolved directories used for uninstall safety checks.
@@ -236,14 +283,17 @@ func confirmUninstall(input io.Reader, output io.Writer, home string) (bool, err
 }
 
 // removeInstallation deletes managed entries before pruning empty parent directories.
-func removeInstallation(root *os.Root, home string, entries []string) error {
+func removeInstallation(ctx context.Context, output io.Writer, root *os.Root, home string, entries []string) error {
 	for _, entry := range entries {
-		if err := root.RemoveAll(filepath.FromSlash(entry)); err != nil {
-			return fmt.Errorf("remove %s: %w", filepath.Join(home, entry), err)
+		path := filepath.Join(home, entry)
+		if err := removeWithRetry(ctx, output, path, func() error {
+			return root.RemoveAll(filepath.FromSlash(entry))
+		}); err != nil {
+			return err
 		}
 	}
 	for _, dir := range []string{"config/tasks", "config", "data", "logs", "releases", "."} {
-		if err := removeEmptyDirectory(root, home, dir); err != nil {
+		if err := removeEmptyDirectory(ctx, output, root, home, dir); err != nil {
 			return err
 		}
 	}
@@ -251,7 +301,7 @@ func removeInstallation(root *os.Root, home string, entries []string) error {
 }
 
 // removeEmptyDirectory preserves directories that still contain user files.
-func removeEmptyDirectory(root *os.Root, home, dir string) error {
+func removeEmptyDirectory(ctx context.Context, output io.Writer, root *os.Root, home, dir string) error {
 	items, e := root.Open(filepath.FromSlash(dir))
 	if errors.Is(e, os.ErrNotExist) {
 		return nil
@@ -272,7 +322,48 @@ func removeEmptyDirectory(root *os.Root, home, dir string) error {
 	if dir == "." {
 		// Release the directory handle before removing it on Windows.
 		root.Close()
-		return os.Remove(home)
+		return removeWithRetry(ctx, output, home, func() error { return os.Remove(home) })
 	}
-	return root.Remove(filepath.FromSlash(dir))
+	return removeWithRetry(ctx, output, filepath.Join(home, dir), func() error {
+		return root.Remove(filepath.FromSlash(dir))
+	})
+}
+
+// removeWithRetry gives Windows time to release file handles after service shutdown.
+func removeWithRetry(ctx context.Context, output io.Writer, path string, remove func() error) error {
+	err := remove()
+	if err == nil || errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	if !isWindowsFileLock(err) {
+		return fmt.Errorf("remove %s: %w", path, err)
+	}
+
+	fmt.Fprintf(output, "Waiting for Windows to release files in %s...\n", path)
+	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+	ticker := time.NewTicker(250 * time.Millisecond)
+	defer ticker.Stop()
+
+	for isWindowsFileLock(err) {
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("remove %s: %w. Close programs using these files, then rerun psu-ext uninstall", path, err)
+		case <-ticker.C:
+			err = remove()
+		}
+	}
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("remove %s: %w", path, err)
+	}
+	return nil
+}
+
+// isWindowsFileLock distinguishes sharing conflicts from permission and filesystem errors.
+func isWindowsFileLock(err error) bool {
+	const (
+		sharingViolation = syscall.Errno(32)
+		lockViolation    = syscall.Errno(33)
+	)
+	return runtime.GOOS == "windows" && (errors.Is(err, sharingViolation) || errors.Is(err, lockViolation))
 }
