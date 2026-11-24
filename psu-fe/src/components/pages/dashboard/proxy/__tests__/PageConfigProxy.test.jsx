@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { PageConfigProxy } from "../PageConfigProxy.jsx";
 
@@ -324,8 +324,9 @@ describe("PageConfigProxy", () => {
     expect(within(deviceListWidget).getByText(/No devices configured/)).toBeInTheDocument();
   });
 
-  it("opens add-device modal on Add Device click and calls addDevice on submit", async () => {
+  it("explains invalid names and allows adding a TCP device alongside an existing USB device", async () => {
     mockConnection.wsConnected = true;
+    mockConnection.devices = mockConnection.devices.filter((device) => device.type === "USB");
     mockConnection.addDevice.mockResolvedValue();
 
     render(<PageConfigProxy />);
@@ -335,18 +336,52 @@ describe("PageConfigProxy", () => {
     const dialog = screen.getByRole("heading", { name: "Add Device" }).closest(".fixed");
     expect(dialog).toBeInTheDocument();
 
-    fireEvent.change(within(dialog).getByLabelText("Name"), { target: { value: "PSU2" } });
-    fireEvent.change(within(dialog).getByLabelText("IP"), { target: { value: "192.168.1.2" } });
-    fireEvent.change(within(dialog).getByLabelText("Port"), { target: { value: "5025" } });
-    fireEvent.click(within(dialog).getByRole("button", { name: "Add Device" }));
+    const name = within(dialog).getByLabelText("Name *");
+    const addButton = within(dialog).getByRole("button", { name: "Add Device" });
+    const type = within(dialog).getByLabelText("Type *");
+    expect(name).toBeRequired();
+    expect(type).toBeRequired();
+    fireEvent.change(type, { target: { value: "USB" } });
+    expect(within(dialog).getByLabelText("COM Port *")).toBeRequired();
+    const baudrate = within(dialog).getByLabelText("Baudrate *");
+    expect(baudrate).toBeRequired();
+    fireEvent.change(baudrate, { target: { value: "invalid" } });
+    fireEvent.change(type, { target: { value: "TCP" } });
+
+    const ip = within(dialog).getByLabelText("IP *");
+    const port = within(dialog).getByLabelText("Port *");
+    expect(ip).toBeRequired();
+    expect(port).toBeRequired();
+    fireEvent.change(name, { target: { value: "WIFI2" } });
+    fireEvent.change(port, { target: { value: "5025" } });
+    fireEvent.change(ip, { target: { value: "   " } });
+    expect(addButton).toBeDisabled();
+    expect(ip).toHaveAccessibleDescription("Enter an IP address or hostname.");
+
+    fireEvent.change(ip, { target: { value: "  psu.local  " } });
+    for (const value of ["   ", "abc", "1.5", "0", "65536"]) {
+      fireEvent.change(port, { target: { value } });
+      expect(addButton).toBeDisabled();
+      expect(port).toHaveAccessibleDescription("Enter a whole number from 1 to 65535.");
+    }
+    fireEvent.change(port, { target: { value: "  65535  " } });
+
+    fireEvent.change(name, { target: { value: "PSUEXTWIFI" } });
+    expect(addButton).toBeDisabled();
+    expect(name).toHaveAccessibleDescription("Use 1 to 8 letters or digits for the device name.");
+
+    fireEvent.change(name, { target: { value: "  wifi2  " } });
+    expect(addButton).toBeEnabled();
+    fireEvent.click(addButton);
 
     expect(mockConnection.addDevice).toHaveBeenCalledWith({
-      name: "PSU2",
+      name: "WIFI2",
       type: "TCP",
-      ip: "192.168.1.2",
-      port: "5025",
+      ip: "psu.local",
+      port: "65535",
       baudrate: "",
     });
+    await waitFor(() => expect(dialog).not.toBeInTheDocument());
   });
 
   it("opens edit-device modal pre-populated with current values and calls modifyDevice on submit", async () => {
@@ -359,11 +394,11 @@ describe("PageConfigProxy", () => {
     fireEvent.click(within(deviceListWidget).getAllByRole("button", { name: /Edit device/ })[0]);
 
     const dialog = screen.getByRole("heading", { name: /Edit Device/ }).closest(".fixed");
-    expect(within(dialog).getByLabelText("Name")).toHaveValue("PSU1");
-    expect(within(dialog).getByLabelText("IP")).toHaveValue("192.168.4.1");
-    expect(within(dialog).getByLabelText("Port")).toHaveValue("5025");
+    expect(within(dialog).getByLabelText("Name *")).toHaveValue("PSU1");
+    expect(within(dialog).getByLabelText("IP *")).toHaveValue("192.168.4.1");
+    expect(within(dialog).getByLabelText("Port *")).toHaveValue("5025");
 
-    fireEvent.change(within(dialog).getByLabelText("IP"), { target: { value: "10.0.0.1" } });
+    fireEvent.change(within(dialog).getByLabelText("IP *"), { target: { value: "10.0.0.1" } });
     fireEvent.click(within(dialog).getByRole("button", { name: "Save Changes" }));
 
     expect(mockConnection.modifyDevice).toHaveBeenCalledWith("0", {
@@ -384,9 +419,9 @@ describe("PageConfigProxy", () => {
     fireEvent.click(screen.getByRole("button", { name: "Add Device" }));
 
     const dialog = screen.getByRole("heading", { name: "Add Device" }).closest(".fixed");
-    fireEvent.change(within(dialog).getByLabelText("Name"), { target: { value: "PSU1" } });
-    fireEvent.change(within(dialog).getByLabelText("IP"), { target: { value: "192.168.1.1" } });
-    fireEvent.change(within(dialog).getByLabelText("Port"), { target: { value: "5025" } });
+    fireEvent.change(within(dialog).getByLabelText("Name *"), { target: { value: "PSU1" } });
+    fireEvent.change(within(dialog).getByLabelText("IP *"), { target: { value: "192.168.1.1" } });
+    fireEvent.change(within(dialog).getByLabelText("Port *"), { target: { value: "5025" } });
     fireEvent.click(within(dialog).getByRole("button", { name: "Add Device" }));
 
     expect(await within(dialog).findByText("ERR DUPLICATE_NAME")).toBeInTheDocument();

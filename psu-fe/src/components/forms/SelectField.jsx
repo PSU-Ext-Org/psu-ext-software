@@ -22,13 +22,17 @@
  * @param {(value: string) => void} props.onChange - Called with the next value.
  * @param {{value: string, label: string}[]} props.options - Available select options.
  * @param {boolean} [props.disabled] - Disables editing when true.
+ * @param {boolean} [props.required] - Marks the field as required.
  * @returns {import("react").ReactElement}
  */
-export function SelectField({ label, value, onChange, options, disabled }) {
+export function SelectField({ label, value, onChange, options, disabled, required }) {
   return (
     <label className="grid min-w-0 gap-1.5 text-sm font-medium text-slate-700">
-      {label}
+      <span>
+        {label}{required ? <span aria-hidden="true"> *</span> : null}
+      </span>
       <select
+        aria-required={required}
         className="control-standard w-full min-w-0 border border-slate-300 bg-white text-slate-950 outline-none focus:border-teal-700 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500"
         value={value}
         onChange={(event) => onChange(event.target.value)}
