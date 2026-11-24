@@ -19,6 +19,14 @@ import { Field } from "../../../forms/Field.jsx";
 import { SelectField } from "../../../forms/SelectField.jsx";
 import { Modal } from "../../../layout/dialogs/Modal.jsx";
 
+const DEVICE_NAME_RULE = "Use 1 to 8 letters or digits for the device name.";
+
+/** Checks a positive decimal integer against the backend's field limit. */
+function isPositiveIntegerWithin(value, max) {
+  const number = Number(value);
+  return /^\+?[0-9]+$/.test(value) && number >= 1 && number <= max;
+}
+
 /**
  * Displays the shared add or edit device form.
  *
@@ -29,21 +37,37 @@ export function DeviceFormModal({ device = null, manager, onClose }) {
   const editing = Boolean(device);
   const [name, setName] = useState(device?.name || "");
   const [type, setType] = useState(device?.type || "TCP");
-  const [ip, setIp] = useState(device?.ip || "");
-  const [port, setPort] = useState(device?.port || "");
-  const [baudrate, setBaudrate] = useState(device?.baudrate || "");
+  const [ip, setIp] = useState(device?.type === "TCP" ? device.ip ?? "" : "");
+  const [tcpPort, setTcpPort] = useState(device?.type === "TCP" ? String(device.port ?? "") : "");
+  const [usbPort, setUsbPort] = useState(device?.type === "USB" ? String(device.port ?? "") : "");
+  const [baudrate, setBaudrate] = useState(device?.type === "USB" ? String(device.baudrate ?? "") : "");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const canSubmit = /^[A-Z0-9]{1,8}$/.test(name)
-    && (type === "TCP" ? Boolean(ip && port) : Boolean(port && baudrate));
+  const isTcp = type === "TCP";
+  const trimmedName = name.trim();
+  const trimmedIp = ip.trim();
+  const trimmedTcpPort = tcpPort.trim();
+  const trimmedUsbPort = usbPort.trim();
+  const trimmedBaudrate = baudrate.trim();
+  const validName = /^[A-Z0-9]{1,8}$/.test(trimmedName);
+  const validTcpPort = isPositiveIntegerWithin(trimmedTcpPort, 65535);
+  const validBaudrate = isPositiveIntegerWithin(trimmedBaudrate, 2_147_483_647);
+  const canSubmit = validName && (isTcp ? trimmedIp !== "" && validTcpPort : trimmedUsbPort !== "" && validBaudrate);
 
   async function submit(event) {
     event.preventDefault();
+    if (!canSubmit || submitting) return;
     setSubmitting(true);
     setError("");
 
     try {
-      const profile = { name, type, ip, port, baudrate };
+      const profile = {
+        name: trimmedName,
+        type,
+        ip: isTcp ? trimmedIp : "",
+        port: isTcp ? trimmedTcpPort : trimmedUsbPort,
+        baudrate: isTcp ? "" : trimmedBaudrate,
+      };
       if (editing) {
         await manager.modifyDevice(device.id, profile);
       } else {
@@ -60,22 +84,59 @@ export function DeviceFormModal({ device = null, manager, onClose }) {
   return (
     <Modal title={editing ? `Edit Device — ${device.name}` : "Add Device"} onClose={onClose}>
       <form className="grid gap-3" onSubmit={submit}>
-        <Field label="Name" value={name} onChange={(value) => setName(value.toUpperCase())} />
+        <Field
+          label="Name"
+          placeholder="PSUEXT1"
+          value={name}
+          onChange={(value) => setName(value.toUpperCase())}
+          hint={name ? "" : DEVICE_NAME_RULE}
+          errorMessage={name && !validName ? DEVICE_NAME_RULE : ""}
+          required
+        />
         <SelectField
           label="Type"
           options={[{ value: "TCP", label: "TCP" }, { value: "USB", label: "USB" }]}
           value={type}
           onChange={setType}
+          required
         />
-        {type === "TCP" ? (
+        {isTcp ? (
           <>
-            <Field label="IP" value={ip} onChange={setIp} />
-            <Field label="Port" value={port} onChange={setPort} />
+            <Field
+              label="IP"
+              placeholder="192.168.4.1"
+              value={ip}
+              onChange={setIp}
+              errorMessage={ip && !trimmedIp ? "Enter an IP address or hostname." : ""}
+              required
+            />
+            <Field
+              label="Port"
+              placeholder="5025"
+              value={tcpPort}
+              onChange={setTcpPort}
+              errorMessage={tcpPort && !validTcpPort ? "Enter a whole number from 1 to 65535." : ""}
+              required
+            />
           </>
         ) : (
           <>
-            <Field label="COM Port" value={port} onChange={setPort} />
-            <Field label="Baudrate" value={baudrate} onChange={setBaudrate} />
+            <Field
+              label="COM Port"
+              placeholder="COM3"
+              value={usbPort}
+              onChange={setUsbPort}
+              errorMessage={usbPort && !trimmedUsbPort ? "Enter a serial port." : ""}
+              required
+            />
+            <Field
+              label="Baudrate"
+              placeholder="9600"
+              value={baudrate}
+              onChange={setBaudrate}
+              errorMessage={baudrate && !validBaudrate ? "Enter a whole number from 1 to 2147483647." : ""}
+              required
+            />
           </>
         )}
         {error ? <p className="text-xs text-rose-600">{error}</p> : null}
